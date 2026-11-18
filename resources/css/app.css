@@ -76,6 +76,11 @@
             dark:disabled:bg-slate-800/30 dark:disabled:text-slate-500;
     }
 
+    /* Date and time fields open their picker on any click (resources/js/app.js). */
+    input.form-control:is([type='date'], [type='time'], [type='datetime-local'], [type='month'], [type='week']):not(:disabled):not([readonly]) {
+        @apply cursor-pointer;
+    }
+
     textarea.form-control {
         @apply h-auto min-h-[6rem] py-2.5 leading-relaxed;
     }

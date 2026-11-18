@@ -193,3 +193,29 @@ window.addEventListener('pageshow', (event) => {
         applyTheme(storedTheme() ? storedTheme() === 'dark' : systemDark.matches, false);
     }
 });
+
+/*
+ * Date and time fields: a click anywhere in the field opens the browser's
+ * picker, not only a click on its calendar icon. Typing still works.
+ */
+const PICKER_TYPES = ['date', 'time', 'datetime-local', 'month', 'week'];
+
+document.addEventListener('click', (event) => {
+    const input = event.target;
+
+    if (
+        !(input instanceof HTMLInputElement) ||
+        !PICKER_TYPES.includes(input.type) ||
+        input.disabled ||
+        input.readOnly ||
+        typeof input.showPicker !== 'function'
+    ) {
+        return;
+    }
+
+    try {
+        input.showPicker();
+    } catch {
+        // Not allowed here (e.g. inside a cross-origin frame): the icon still works.
+    }
+});

@@ -151,12 +151,10 @@
                 <div class="relative overflow-x-auto">
                     @php
                         // One width rule per column, shared by heading and cells, so every row lines up the same way.
-                        $lastColumn = count($layout->headings()) - 1;
                         $columnClass = fn (int $index) => match (true) {
                             $index === 0 => 'w-14 whitespace-nowrap tabular-nums',                 // No
                             $index === 1 => 'min-w-[8.5rem] whitespace-nowrap tabular-nums',       // Tanggal
                             $index === 2, $index === 3 => 'min-w-[12rem] max-w-[16rem]',           // Unit, Diinput oleh
-                            $index === $lastColumn => 'min-w-[7rem] whitespace-nowrap',            // Versi formulir
                             default => 'min-w-[10rem] max-w-[18rem]',                              // form answers
                         };
                     @endphp

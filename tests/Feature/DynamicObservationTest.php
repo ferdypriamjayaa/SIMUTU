@@ -346,7 +346,8 @@ class DynamicObservationTest extends TestCase
         $this->assertSame('Face Shield, Sepatu Boot', $cell(1, 'APD Tambahan'));
         $this->assertSame('Kepala Ruang', $cell(2, 'Supervisor'));
         $this->assertNull($cell(0, 'Supervisor'));
-        $this->assertSame(['Versi 1', 'Versi 2', 'Versi 3'], array_map(fn (array $row) => $cell(array_search($row, $rows, true), 'Versi Formulir'), $rows));
+        // The report carries the answers only, not the form version they were recorded on.
+        $this->assertNotContains('Versi Formulir', $headings);
         $this->assertCount(count($headings), $rows[0]);
 
         $this->actingAs($picMutu)->get(route('observations.export', ['format' => 'pdf', 'indicator_id' => $this->indicator->id, 'start_date' => now()->subMonth()->toDateString(), 'end_date' => now()->toDateString()]))->assertOk();

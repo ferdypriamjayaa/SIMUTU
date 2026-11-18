@@ -174,8 +174,10 @@ class ObservationReportPageTest extends TestCase
 
         // IMP RS: every field a column, the officer's name right after "Diinput Oleh", choices as labelled.
         $rs = $this->report($this->picMutu, ['kategori' => 'imp-rs', 'indicator_id' => $this->impRs->id, ...self::PERIOD])->assertOk();
-        $rs->assertSeeInOrder(['Diinput Oleh', 'Nama Petugas', 'Nama Pasien', 'Ruangan', 'Checklist — Sign In', 'Catatan', 'Versi Formulir'])
-            ->assertSeeInOrder(['Instalasi Gawat Darurat', 'Rina', 'Tn. Budi', 'ICU', 'Ya', 'Lengkap', 'Versi 1'])
+        $rs->assertSeeInOrder(['Diinput Oleh', 'Nama Petugas', 'Nama Pasien', 'Ruangan', 'Checklist — Sign In', 'Catatan'])
+            ->assertSeeInOrder(['Instalasi Gawat Darurat', 'Rina', 'Tn. Budi', 'ICU', 'Ya', 'Lengkap'])
+            ->assertDontSee('Versi Formulir')
+            ->assertDontSee('Versi 1')
             ->assertDontSee('Norbayah');
 
         // IMP Unit

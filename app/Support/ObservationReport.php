@@ -27,8 +27,6 @@ class ObservationReport
     /** Leading columns of every indicator's table. */
     public const LEADING = ['No', 'Tanggal Observasi', 'Unit', 'Diinput Oleh'];
 
-    public const TRAILING = ['Versi Formulir'];
-
     /** @var array<string, string> field key => column heading */
     private array $columns = [];
 
@@ -80,7 +78,7 @@ class ObservationReport
      */
     public function headings(): array
     {
-        return [...self::LEADING, ...array_values($this->columns), ...self::TRAILING];
+        return [...self::LEADING, ...array_values($this->columns)];
     }
 
     /**
@@ -102,7 +100,6 @@ class ObservationReport
                 fn (string $key) => isset($answers[$key]) ? ObservationAnswers::format($answers[$key]['field'], $answers[$key]['raw']) : '-',
                 array_keys($this->columns),
             ),
-            $this->versionLabel($observation),
         ];
     }
 
@@ -126,7 +123,6 @@ class ObservationReport
                 fn (string $key) => isset($answers[$key]) ? self::typedCell($answers[$key]['field'], $answers[$key]['raw']) : XlsxSheet::cell(null),
                 array_keys($this->columns),
             ),
-            XlsxSheet::cell($this->versionLabel($observation)),
         ];
     }
 
@@ -184,13 +180,6 @@ class ObservationReport
     private static function heading(IndicatorField $field): string
     {
         return filled($field->section) ? "{$field->section} — {$field->label}" : $field->label;
-    }
-
-    private function versionLabel(Observation $observation): string
-    {
-        $version = ObservationAnswers::versionFor($observation);
-
-        return $version ? 'Versi '.$version->version : '-';
     }
 
     /**

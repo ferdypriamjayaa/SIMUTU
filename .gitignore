@@ -35,3 +35,6 @@ yarn-error.log
 /storage/*.log
 .DS_Store
 Thumbs.db
+
+# Real users (NIP, names, password hashes) exported for SnapshotSeeder
+/database/seeders/snapshot/

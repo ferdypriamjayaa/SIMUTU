@@ -226,13 +226,13 @@ class ObservationExportTest extends TestCase
         $this->assertSame([
             ...$leading, 'Nama Petugas yang Diobservasi', 'Nama Pasien',
             'Aktivitas yang Diobservasi — Sebelum pemberian obat atau injeksi', 'Aktivitas yang Diobservasi — Sebelum tindakan atau prosedur',
-            'Kriteria Identifikasi Pasien — Nama pasien', 'Kriteria Identifikasi Pasien — Tanggal lahir', 'Catatan', 'Versi Formulir',
+            'Kriteria Identifikasi Pasien — Nama pasien', 'Kriteria Identifikasi Pasien — Tanggal lahir', 'Catatan',
         ], $this->xlsxValues($inm['Kepatuhan Identifikasi Pasien'][self::HEADER]));
         $this->assertSame([
             ...$leading, 'Nama Petugas', 'Nama Pasien', 'Jumlah Berkas', 'Skor', 'Tanggal Masuk', 'Jam Visite', 'Waktu Pulang', 'Ruang', 'Shift',
-            'Kelengkapan — Dokumen Lengkap', 'Kelengkapan — Tanda Tangan DPJP', 'Catatan', 'Versi Formulir',
+            'Kelengkapan — Dokumen Lengkap', 'Kelengkapan — Tanda Tangan DPJP', 'Catatan',
         ], $this->xlsxValues($rs['Kepatuhan Pengisian Rekam Medis'][self::HEADER]));
-        $this->assertSame([...$leading, 'Patuh', 'Momen', 'Versi Formulir'], $this->xlsxValues($unit['Kepatuhan Cuci Tangan Unit'][self::HEADER]));
+        $this->assertSame([...$leading, 'Patuh', 'Momen'], $this->xlsxValues($unit['Kepatuhan Cuci Tangan Unit'][self::HEADER]));
 
         // Nothing is folded into a "Detail" column.
         foreach ([$inm, $rs, $unit] as $sheets) {
@@ -245,10 +245,10 @@ class ObservationExportTest extends TestCase
 
         // Every answer in its own cell.
         $this->assertSame(
-            [1.0, (float) self::NOV_10, 'Rawat Inap NS3A', null, 'Taufik Hidayat', 'Norbayah', 'Tidak', 'Ya', 'Ya', 'Ya', null, 'Versi 1'],
+            [1.0, (float) self::NOV_10, 'Rawat Inap NS3A', null, 'Taufik Hidayat', 'Norbayah', 'Tidak', 'Ya', 'Ya', 'Ya', null],
             array_replace($this->xlsxValues($inm['Kepatuhan Identifikasi Pasien'][6]), [3 => null]),
         );
-        $this->assertSame([1.0, (float) (self::NOV_10 + 1), 'Instalasi Gawat Darurat', 'Perawat NS3A', 'Ya', 'Sesudah kontak pasien', 'Versi 1'],
+        $this->assertSame([1.0, (float) (self::NOV_10 + 1), 'Instalasi Gawat Darurat', 'Perawat NS3A', 'Ya', 'Sesudah kontak pasien'],
             $this->xlsxValues($unit['Kepatuhan Cuci Tangan Unit'][6]));
 
         // Summary: category, indicator, period, unit, counts, link to the data sheet.
@@ -310,7 +310,8 @@ class ObservationExportTest extends TestCase
         $this->assertSame('Resume Medis, Informed Consent', $row['N']['value']);
         $this->assertSame('Tidak', $row['O']['value']);
         $this->assertSame("Baris satu\nBaris dua", $row['P']['value']);
-        $this->assertSame('Versi 1', $row['Q']['value']);
+        // No form version column: the last answer is the last column.
+        $this->assertArrayNotHasKey('Q', $row);
 
         // The observation date column is a date too.
         $this->assertSame([(float) self::NOV_10, XlsxWorkbook::STYLES['date']], [$row['B']['value'], $row['B']['style']]);
@@ -335,7 +336,7 @@ class ObservationExportTest extends TestCase
         $this->assertSame(['Pertama', 0.0, null, 'akhir'], [$rs[0]['E']['value'], $rs[0]['G']['value'], $rs[0]['O']['value'], $rs[0]['P']['value']]);
         $this->assertSame(['Kedua', null, 'Ya', null], [$rs[1]['E']['value'], $rs[1]['G']['value'], $rs[1]['O']['value'], $rs[1]['P']['value']]);
         $this->assertCount(count($rsSheet[self::HEADER]), $rs[0]);
-        $this->assertSame([null, 'Sebelum kontak pasien', 'Versi 1'], array_slice($this->xlsxValues($unit[0]), 4));
+        $this->assertSame([null, 'Sebelum kontak pasien'], array_slice($this->xlsxValues($unit[0]), 4));
     }
 
     public function test_historical_observations_follow_the_form_they_were_recorded_on(): void
@@ -360,10 +361,10 @@ class ObservationExportTest extends TestCase
         $sheet = $this->workbook(['indicator_id' => $indicator->id])['Kepatuhan Berubah Formulir'];
 
         // Newest version's order and labels, then fields only older versions had.
-        $this->assertSame(['Kolom B', 'Kolom C', 'Kolom A', 'Versi Formulir'], array_slice($this->xlsxValues($sheet[self::HEADER]), 4));
+        $this->assertSame(['Kolom B', 'Kolom C', 'Kolom A'], array_slice($this->xlsxValues($sheet[self::HEADER]), 4));
         // Each answer is labelled by the version it was recorded on.
-        $this->assertSame(['Pilihan X lama', null, 'lama', 'Versi 1'], array_slice($this->xlsxValues($sheet[6]), 4));
-        $this->assertSame(['Pilihan X baru', 'Ya', null, 'Versi 2'], array_slice($this->xlsxValues($sheet[7]), 4));
+        $this->assertSame(['Pilihan X lama', null, 'lama'], array_slice($this->xlsxValues($sheet[6]), 4));
+        $this->assertSame(['Pilihan X baru', 'Ya', null], array_slice($this->xlsxValues($sheet[7]), 4));
     }
 
     public function test_records_from_before_form_versions_are_exported(): void
@@ -383,7 +384,7 @@ class ObservationExportTest extends TestCase
 
         $row = $this->workbook()['Kepatuhan Identifikasi Pasien'][6];
 
-        $this->assertSame(['Petugas Lama', 'Pasien Lama', 'Ya', 'Tidak', 'Ya', 'Ya', null, 'Versi 1'], array_slice($this->xlsxValues($row), 4));
+        $this->assertSame(['Petugas Lama', 'Pasien Lama', 'Ya', 'Tidak', 'Ya', 'Ya', null], array_slice($this->xlsxValues($row), 4));
         $this->assertNull($legacy->fresh()->indicator_form_version_id);
     }
 
@@ -468,15 +469,15 @@ class ObservationExportTest extends TestCase
         // Frozen header, auto filter over the data, widths for every column.
         $this->assertSame('frozen', (string) $sheet->sheetViews->sheetView->pane['state']);
         $this->assertSame('A6', (string) $sheet->sheetViews->sheetView->pane['topLeftCell']);
-        $this->assertSame('A5:L7', (string) $sheet->autoFilter['ref']);
-        $this->assertCount(12, $sheet->cols->col);
+        $this->assertSame('A5:K7', (string) $sheet->autoFilter['ref']);
+        $this->assertCount(11, $sheet->cols->col);
         foreach ($sheet->cols->col as $col) {
             $this->assertGreaterThanOrEqual(6, (float) $col['width']);
             $this->assertLessThanOrEqual(60, (float) $col['width']);
         }
         $definedNames = (new \SimpleXMLElement($this->xlsxParts($bytes)['xl/workbook.xml']))->definedNames->definedName;
         $filterNames = array_values(array_filter(iterator_to_array($definedNames, false), fn ($name) => (string) $name['name'] === '_xlnm._FilterDatabase'));
-        $this->assertSame(["'Kepatuhan Identifikasi Pasien'!\$A\$5:\$L\$7"], array_map('strval', $filterNames));
+        $this->assertSame(["'Kepatuhan Identifikasi Pasien'!\$A\$5:\$K\$7"], array_map('strval', $filterNames));
 
         // Title block: indicator, category, period and unit on their own rows.
         $this->assertSame('Kepatuhan Identifikasi Pasien', $rows[1]['A']['value']);
