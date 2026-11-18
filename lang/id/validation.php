@@ -94,7 +94,7 @@ return [
         'password' => 'kata sandi',
         'current_password' => 'kata sandi saat ini',
         'password_confirmation' => 'konfirmasi kata sandi',
-        'role' => 'peran',
+        'role' => 'jabatan',
         'unit_id' => 'unit',
         'code' => 'kode',
     ],

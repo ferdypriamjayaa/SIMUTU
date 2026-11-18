@@ -12,24 +12,70 @@
             </x-alert>
         @endif
 
-        <x-card title="Daftar Pengguna" :description="$users->total().' akun terdaftar'" icon="users" :padded="false">
-            <x-slot name="actions">
-                <form method="GET" action="{{ route('users.index') }}" class="flex w-full gap-2 sm:w-auto" role="search">
-                    <div class="relative flex-1 sm:w-72">
+        @php
+            $unitOptions = [['value' => 'all', 'label' => 'Semua Unit'],
+                ...$units->map(fn ($item) => ['value' => (string) $item->id, 'label' => $item->name.($item->is_active ? '' : ' (nonaktif)')])->all()];
+            $selectedUnit = $unit ? ['value' => (string) $unit->id, 'label' => $unit->name] : $unitOptions[0];
+            $columns = ['Pengguna' => 'name', 'NIP' => null, 'Jabatan' => 'role', 'Unit' => 'unit', 'Status' => null];
+        @endphp
+
+        <x-card title="Daftar Pengguna" :description="$users->total().($filtered ? ' akun ditemukan' : ' akun terdaftar')" icon="users" :padded="false">
+            <form method="GET" action="{{ route('users.index') }}" role="search"
+                class="grid gap-3 border-b border-gray-100 p-5 dark:border-slate-800 sm:grid-cols-2 sm:px-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+                <input type="hidden" name="sort" value="{{ $sort }}" />
+                <input type="hidden" name="direction" value="{{ $direction }}" />
+
+                <x-form.field label="Cari" for="search" class="sm:col-span-2 xl:col-span-1">
+                    <div class="relative">
                         <x-icon name="search" class="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-slate-500" />
-                        <input type="search" name="search" value="{{ $search }}" placeholder="Cari nama, NIP, atau email"
-                            aria-label="Cari pengguna" class="form-control form-control-sm ps-9" />
+                        <input type="search" id="search" name="search" value="{{ $search }}" placeholder="Nama, NIP, atau email" class="form-control ps-9" />
                     </div>
-                    <x-button variant="navy" class="h-10" loading-text="Mencari…">Cari</x-button>
-                </form>
-            </x-slot>
+                </x-form.field>
+
+                <x-form.field label="Jabatan" for="role">
+                    <x-form.select name="role">
+                        <option value="">Semua Jabatan</option>
+                        @foreach (\App\Models\User::ROLES as $value => $label)
+                            <option value="{{ $value }}" @selected($role === $value)>{{ $label }}</option>
+                        @endforeach
+                    </x-form.select>
+                </x-form.field>
+
+                <x-form.field label="Unit" for="unit_id">
+                    <x-form.combobox name="unit_id" :options="$unitOptions" :selected="$selectedUnit"
+                        search-placeholder="Cari unit…" empty-text="Tidak ada unit." />
+                </x-form.field>
+
+                <div class="flex gap-2 sm:col-span-2 xl:col-span-1 xl:self-end">
+                    <x-button variant="navy" icon="filter" loading-text="Memuat…" class="flex-1 xl:flex-none">Terapkan</x-button>
+                    @if ($filtered)
+                        <x-button :href="route('users.index', ['sort' => $sort, 'direction' => $direction])" variant="secondary" class="flex-1 xl:flex-none">Reset</x-button>
+                    @endif
+                </div>
+            </form>
 
             <div class="overflow-x-auto">
                 <table class="table-base">
                     <thead>
                         <tr>
-                            @foreach (['Pengguna', 'NIP', 'Peran', 'Unit', 'Status'] as $heading)
-                                <th>{{ $heading }}</th>
+                            @foreach ($columns as $heading => $column)
+                                @php
+                                    $active = $column !== null && $sort === $column;
+                                    $next = $active && $direction === 'asc' ? 'desc' : 'asc';
+                                @endphp
+                                <th @if ($active) aria-sort="{{ $direction === 'asc' ? 'ascending' : 'descending' }}" @endif>
+                                    @if ($column)
+                                        <a href="{{ request()->fullUrlWithQuery(['sort' => $column, 'direction' => $next, 'page' => null]) }}"
+                                            title="Urutkan berdasarkan {{ $heading }}"
+                                            @class(['inline-flex items-center gap-1 uppercase transition-colors hover:text-navy-900 dark:hover:text-slate-100', 'text-navy-900 dark:text-slate-100' => $active])>
+                                            {{ $heading }}
+                                            <x-icon :name="$active && $direction === 'desc' ? 'chevron-down' : 'chevron-up'"
+                                                @class(['h-3.5 w-3.5', 'opacity-30' => ! $active]) />
+                                        </a>
+                                    @else
+                                        {{ $heading }}
+                                    @endif
+                                </th>
                             @endforeach
                             <th class="text-right"><span class="sr-only">Aksi</span></th>
                         </tr>
@@ -100,7 +146,7 @@
                         @empty
                             <tr>
                                 <td colspan="6">
-                                    <x-empty-state icon="users" title="Tidak ada pengguna." description="Coba kata kunci pencarian lain." />
+                                    <x-empty-state icon="users" title="Tidak ada pengguna." description="Coba ubah pencarian atau filter." />
                                 </td>
                             </tr>
                         @endforelse

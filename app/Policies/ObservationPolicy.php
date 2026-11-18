@@ -32,7 +32,7 @@ class ObservationPolicy
     public function create(User $user): Response
     {
         if (! $user->hasRole(User::ROLE_ADMIN, User::ROLE_PIC_UNIT)) {
-            return Response::deny('Peran Anda tidak dapat menginput observasi.');
+            return Response::deny('Jabatan Anda tidak dapat menginput observasi.');
         }
 
         if ($user->activeUnit() === null) {
@@ -71,7 +71,7 @@ class ObservationPolicy
         }
 
         if (! $user->isPicUnit()) {
-            return Response::deny("Peran Anda tidak dapat {$action} observasi.");
+            return Response::deny("Jabatan Anda tidak dapat {$action} observasi.");
         }
 
         $unit = $user->activeUnit();

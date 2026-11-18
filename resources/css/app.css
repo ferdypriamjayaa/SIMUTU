@@ -91,7 +91,7 @@
 
     /* Searchable dropdown (components/form/combobox.blade.php). */
     .combobox-trigger {
-        @apply flex items-center justify-between gap-2 text-left;
+        @apply !mt-0 flex items-center justify-between gap-2 text-left;
     }
 
     .combobox-trigger-open {

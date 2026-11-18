@@ -23,9 +23,16 @@ class UserController extends Controller
 
     public function index(Request $request): View
     {
-        $search = trim((string) $request->query('search'));
+        $units = Unit::orderBy('name')->get(['id', 'name', 'is_active']);
 
-        $users = User::with('unit')
+        // Unknown values in the address are ignored rather than showing an empty list.
+        $search = trim((string) $request->query('search'));
+        $role = array_key_exists((string) $request->query('role'), User::ROLES) ? (string) $request->query('role') : '';
+        $unit = $units->firstWhere('id', filter_var($request->query('unit_id'), FILTER_VALIDATE_INT));
+        $sort = in_array($request->query('sort'), ['name', 'role', 'unit'], true) ? $request->query('sort') : 'name';
+        $direction = $request->query('direction') === 'desc' ? 'desc' : 'asc';
+
+        $query = User::with('unit')
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
                     $query->where('name', 'like', "%{$search}%")
@@ -33,13 +40,32 @@ class UserController extends Controller
                         ->orWhere('email', 'like', "%{$search}%");
                 });
             })
-            ->orderBy('name')
-            ->paginate(15)
-            ->withQueryString();
+            ->when($role !== '', fn ($query) => $query->where('role', $role))
+            ->when($unit, fn ($query) => $query->where('unit_id', $unit->id));
+
+        match ($sort) {
+            'role' => $query->orderByRaw(
+                "case role when 'admin' then 0 when 'pic_mutu' then 1 when 'pic_unit' then 2 else 3 end {$direction}"
+            ),
+            // Accounts without a unit stay at the end in both directions.
+            'unit' => $query->orderByRaw('unit_id is null')
+                ->orderBy(Unit::select('name')->whereColumn('units.id', 'users.unit_id'), $direction),
+            default => $query->orderBy('name', $direction),
+        };
+
+        if ($sort !== 'name') {
+            $query->orderBy('name');
+        }
 
         return view('users.index', [
-            'users' => $users,
+            'users' => $query->paginate(15)->withQueryString(),
             'search' => $search,
+            'role' => $role,
+            'unit' => $unit,
+            'sort' => $sort,
+            'direction' => $direction,
+            'units' => $units,
+            'filtered' => $search !== '' || $role !== '' || $unit !== null,
             'missingNipCount' => User::whereNull('nip')->count(),
         ]);
     }
@@ -90,7 +116,7 @@ class UserController extends Controller
         if ($user->is($request->user()) && $validated['role'] !== User::ROLE_ADMIN) {
             return back()
                 ->withInput()
-                ->withErrors(['role' => 'Anda tidak dapat menurunkan peran akun Anda sendiri.']);
+                ->withErrors(['role' => 'Anda tidak dapat menurunkan jabatan akun Anda sendiri.']);
         }
 
         $attributes = [
@@ -198,7 +224,7 @@ class UserController extends Controller
             'nip' => 'NIP',
             'name' => 'Nama',
             'email' => 'Email',
-            'role' => 'Peran',
+            'role' => 'Jabatan',
             'unit_id' => 'Unit',
             'password' => 'Kata Sandi',
         ]);

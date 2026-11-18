@@ -34,7 +34,7 @@
                     </legend>
 
                     <x-form.field label="PIC Unit (Karyawan HRIS)" for="hris_employee_search" error="hris_employee_id" optional
-                        hint="Memilih karyawan aktif HRIS (RS BJB & RS BRB) mengisi Nama dan NIP secara otomatis. Peran, unit, email, dan kata sandi tidak berubah.">
+                        hint="Memilih karyawan aktif HRIS (RS BJB & RS BRB) mengisi Nama dan NIP secara otomatis. Jabatan, unit, email, dan kata sandi tidak berubah.">
                         <div @click.outside="open = false" @keydown.escape="open = false" class="relative space-y-2">
                             <input type="hidden" name="hris_employee_id" :value="id" value="{{ $hrisChosen }}">
 
@@ -121,7 +121,7 @@
                 </legend>
 
                 <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                    <x-form.field label="Peran" for="role" required>
+                    <x-form.field label="Jabatan" for="role" required>
                         <x-form.select name="role" required>
                             @foreach (App\Models\User::ROLES as $value => $label)
                                 <option value="{{ $value }}" @selected(old('role', $user->role) === $value)>{{ $label }}</option>

@@ -71,7 +71,7 @@ class AssignUserNip extends Command
         }
 
         $this->warn('Akun berikut belum memiliki NIP dan belum dapat login:');
-        $this->table(['ID', 'Nama', 'Email', 'Peran'], $users->map->only(['id', 'name', 'email', 'role']));
+        $this->table(['ID', 'Nama', 'Email', 'Jabatan'], $users->map->only(['id', 'name', 'email', 'role']));
         $this->line('Gunakan: php artisan simutu:assign-nip <id|email> <nip>');
 
         return self::SUCCESS;

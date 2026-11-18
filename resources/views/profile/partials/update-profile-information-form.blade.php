@@ -12,14 +12,14 @@
             <dd class="mt-0.5 font-mono font-semibold text-navy-900 dark:text-slate-100">{{ $user->nip ?? '-' }}</dd>
         </div>
         <div>
-            <dt class="text-xs text-gray-500 dark:text-slate-400">Peran</dt>
+            <dt class="text-xs text-gray-500 dark:text-slate-400">Jabatan</dt>
             <dd class="mt-0.5 font-semibold text-navy-900 dark:text-slate-100">{{ $user->roleLabel() }}</dd>
         </div>
         <div>
             <dt class="text-xs text-gray-500 dark:text-slate-400">Unit</dt>
             <dd class="mt-0.5 font-semibold text-navy-900 dark:text-slate-100">{{ $user->unit?->name ?? '-' }}</dd>
         </div>
-        <p class="text-xs text-gray-500 dark:text-slate-400 sm:col-span-3">NIP, peran, dan unit hanya dapat diubah oleh administrator.</p>
+        <p class="text-xs text-gray-500 dark:text-slate-400 sm:col-span-3">NIP, jabatan, dan unit hanya dapat diubah oleh administrator.</p>
     </dl>
 
     <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">

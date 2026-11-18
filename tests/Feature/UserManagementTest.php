@@ -27,6 +27,70 @@ class UserManagementTest extends TestCase
         $this->unit = Unit::create(['code' => 'IGD', 'name' => 'IGD', 'is_active' => true]);
     }
 
+    /** @return array{0: User, 1: User, 2: User} PIC Mutu, PIC Unit (IGD), PIC Unit (Kasir) */
+    private function usersAcrossUnits(): array
+    {
+        $finance = Unit::create(['code' => 'KASIR', 'name' => 'Kasir', 'is_active' => true]);
+
+        return [
+            User::factory()->create(['name' => 'Budi Mutu', 'role' => User::ROLE_PIC_MUTU, 'unit_id' => null]),
+            User::factory()->create(['name' => 'Citra Medik', 'role' => User::ROLE_PIC_UNIT, 'unit_id' => $this->unit->id]),
+            User::factory()->create(['name' => 'Dina Kasir', 'role' => User::ROLE_PIC_UNIT, 'unit_id' => $finance->id]),
+        ];
+    }
+
+    /** @return list<string> */
+    private function listedNames(array $query): array
+    {
+        return $this->actingAs($this->admin)->get(route('users.index', $query))
+            ->assertOk()
+            ->viewData('users')->pluck('name')->all();
+    }
+
+    public function test_user_list_filters_by_role_and_unit(): void
+    {
+        [, , $finance] = $this->usersAcrossUnits();
+
+        $this->assertSame(['Budi Mutu'], $this->listedNames(['role' => User::ROLE_PIC_MUTU]));
+        $this->assertSame(['Citra Medik', 'Dina Kasir'], $this->listedNames(['role' => User::ROLE_PIC_UNIT]));
+        $this->assertSame(['Dina Kasir'], $this->listedNames(['unit_id' => $finance->unit_id]));
+        $this->assertSame([], $this->listedNames(['role' => User::ROLE_PIC_MUTU, 'unit_id' => $this->unit->id]));
+    }
+
+    public function test_user_list_sorts_by_role_and_unit_in_both_directions(): void
+    {
+        $this->usersAcrossUnits();
+        $this->admin->update(['name' => 'Ana Admin']);
+
+        $this->assertSame(['Ana Admin', 'Budi Mutu', 'Citra Medik', 'Dina Kasir'], $this->listedNames(['sort' => 'role']));
+        $this->assertSame(['Citra Medik', 'Dina Kasir', 'Budi Mutu', 'Ana Admin'], $this->listedNames(['sort' => 'role', 'direction' => 'desc']));
+
+        // By unit name; accounts without a unit stay last.
+        $this->assertSame(['Citra Medik', 'Dina Kasir', 'Ana Admin', 'Budi Mutu'], $this->listedNames(['sort' => 'unit']));
+        $this->assertSame(['Dina Kasir', 'Citra Medik', 'Ana Admin', 'Budi Mutu'], $this->listedNames(['sort' => 'unit', 'direction' => 'desc']));
+    }
+
+    public function test_user_list_ignores_unknown_filter_and_sort_values(): void
+    {
+        $this->usersAcrossUnits();
+        $this->admin->update(['name' => 'Ana Admin']);
+
+        $this->assertSame(
+            ['Ana Admin', 'Budi Mutu', 'Citra Medik', 'Dina Kasir'],
+            $this->listedNames(['role' => 'x', 'unit_id' => 'all', 'sort' => 'password', 'direction' => 'sideways']),
+        );
+    }
+
+    public function test_user_list_keeps_filters_in_pagination_and_sort_links(): void
+    {
+        User::factory()->count(16)->create(['role' => User::ROLE_PIC_MUTU, 'unit_id' => null]);
+
+        $this->actingAs($this->admin)->get(route('users.index', ['role' => User::ROLE_PIC_MUTU, 'sort' => 'role']))
+            ->assertOk()
+            ->assertSee('role=pic_mutu&amp;sort=role&amp;page=2', false)
+            ->assertSee('direction=desc', false);
+    }
+
     public function test_admin_can_create_pic_unit_account_that_logs_in_with_nip(): void
     {
         $response = $this->actingAs($this->admin)->post(route('users.store'), [
