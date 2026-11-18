@@ -1,0 +1,386 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * SIMUTU design system. Tokens live in tailwind.config.js; the classes below
+ * are shared by the Blade components in resources/views/components so every
+ * page uses the same controls, spacing and states.
+ */
+
+@layer base {
+    html {
+        /* Matches the layout background, so there is no white flash between pages. */
+        background-color: theme('colors.surface');
+        color-scheme: light;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Dark theme: set before first paint by components/theme-script.blade.php. */
+    html.dark {
+        background-color: theme('colors.slate.950');
+        color-scheme: dark;
+    }
+
+    body {
+        @apply bg-surface text-gray-800 dark:bg-slate-950 dark:text-slate-200;
+    }
+
+    :focus-visible {
+        outline: none;
+    }
+
+    input[type='checkbox'],
+    input[type='radio'] {
+        accent-color: theme('colors.brand.600');
+    }
+
+    .dark input[type='checkbox']:not(:checked),
+    .dark input[type='radio']:not(:checked) {
+        @apply border-slate-600 bg-slate-800;
+    }
+
+    /* Native date picker: same text colour and icon tint as other fields. */
+    input[type='date']::-webkit-calendar-picker-indicator {
+        cursor: pointer;
+        opacity: 0.55;
+    }
+
+    input[type='date']::-webkit-calendar-picker-indicator:hover {
+        opacity: 0.9;
+    }
+
+    [x-cloak] {
+        display: none !important;
+    }
+}
+
+@layer components {
+    /* ---- Forms ---------------------------------------------------------- */
+    .form-label {
+        @apply mb-1.5 block text-sm font-medium text-navy-900 dark:text-slate-200;
+    }
+
+    .form-label-required::after {
+        content: ' *';
+        @apply text-brand-600 dark:text-brand-400;
+    }
+
+    .form-control {
+        @apply block h-11 w-full rounded-lg border border-gray-300 bg-white px-3.5 text-base text-gray-900 sm:text-sm shadow-sm transition
+            placeholder:text-gray-400
+            focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15
+            disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500
+            dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-100 dark:shadow-none dark:placeholder:text-slate-500
+            dark:focus:border-brand-400 dark:focus:ring-brand-400/20
+            dark:disabled:bg-slate-800/30 dark:disabled:text-slate-500;
+    }
+
+    textarea.form-control {
+        @apply h-auto min-h-[6rem] py-2.5 leading-relaxed;
+    }
+
+    select.form-control {
+        @apply pe-10;
+    }
+
+    /* Searchable dropdown (components/form/combobox.blade.php). */
+    .combobox-trigger {
+        @apply flex items-center justify-between gap-2 text-left;
+    }
+
+    .combobox-trigger-open {
+        @apply border-brand-500 ring-4 ring-brand-500/15 dark:border-brand-400 dark:ring-brand-400/20;
+    }
+
+    .form-control-sm {
+        @apply h-10;
+    }
+
+    .form-control-invalid {
+        @apply border-red-400 focus:border-red-500 focus:ring-red-500/15 dark:border-red-500/70 dark:focus:border-red-400 dark:focus:ring-red-400/20;
+    }
+
+    .form-hint {
+        @apply mt-1.5 text-xs text-gray-500 dark:text-slate-400;
+    }
+
+    .form-error {
+        @apply mt-1.5 flex items-start gap-1 text-xs font-medium text-red-600 dark:text-red-400;
+    }
+
+    .form-checkbox-base {
+        @apply h-4 w-4 rounded border-gray-300 text-brand-600 shadow-sm focus:ring-brand-500/30;
+    }
+
+    /* Ya/Tidak choice rendered as a segmented control. */
+    .choice {
+        @apply relative flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-medium text-gray-600 transition
+            hover:border-gray-400 hover:bg-gray-50
+            dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800;
+    }
+
+    .choice:has(input:focus-visible) {
+        @apply ring-4 ring-brand-500/20;
+    }
+
+    .choice-yes:has(input:checked) {
+        @apply border-accent-500 bg-accent-50 text-accent-700 dark:border-accent-500/70 dark:bg-accent-500/15 dark:text-accent-300;
+    }
+
+    .choice-no:has(input:checked) {
+        @apply border-red-300 bg-red-50 text-red-700 dark:border-red-500/60 dark:bg-red-500/15 dark:text-red-300;
+    }
+
+    /* Conditional fields (resources/js/conditional-fields.js). */
+    [data-visible-when][hidden],
+    [data-section][hidden] {
+        display: none !important;
+    }
+
+    .field-reveal {
+        animation: field-reveal 0.2s ease-out;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .field-reveal {
+            animation: none;
+        }
+    }
+
+    /* Radio / checkbox option as a large tap target (phone-friendly). */
+    .choice-option {
+        @apply flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm leading-snug text-gray-700 transition
+            hover:border-gray-300 hover:bg-gray-50
+            dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800;
+    }
+
+    .choice-option:has(input:checked) {
+        @apply border-brand-500 bg-brand-50 font-medium text-brand-800 dark:border-brand-400/70 dark:bg-brand-500/15 dark:text-brand-100;
+    }
+
+    .choice-option:has(input:focus-visible) {
+        @apply ring-4 ring-brand-500/20;
+    }
+
+    /* ---- Buttons -------------------------------------------------------- */
+    .btn {
+        @apply inline-flex h-11 shrink-0 select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-semibold transition
+            focus:outline-none focus-visible:ring-4 disabled:pointer-events-none disabled:opacity-60;
+    }
+
+    .btn-sm {
+        @apply h-9 gap-1.5 px-3 text-xs;
+    }
+
+    .btn-primary {
+        @apply bg-brand-600 text-white shadow-sm shadow-brand-700/20 hover:bg-brand-700 focus-visible:ring-brand-500/30 dark:shadow-none dark:hover:bg-brand-500;
+    }
+
+    .btn-navy {
+        @apply bg-navy-800 text-white shadow-sm hover:bg-navy-900 focus-visible:ring-navy-500/30 dark:bg-slate-700 dark:hover:bg-slate-600;
+    }
+
+    .btn-secondary {
+        @apply border border-gray-300 bg-white text-navy-800 shadow-sm hover:border-gray-400 hover:bg-gray-50 focus-visible:ring-navy-500/20
+            dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:shadow-none dark:hover:border-slate-600 dark:hover:bg-slate-700 dark:focus-visible:ring-slate-400/20;
+    }
+
+    .btn-danger {
+        @apply bg-red-600 text-white shadow-sm hover:bg-red-700 focus-visible:ring-red-500/30 dark:hover:bg-red-500;
+    }
+
+    .btn-ghost {
+        @apply text-gray-600 hover:bg-gray-100 hover:text-navy-900 focus-visible:ring-navy-500/20
+            dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100 dark:focus-visible:ring-slate-400/20;
+    }
+
+    .btn-icon {
+        @apply inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-navy-900
+            focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/20
+            dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100;
+    }
+
+    .btn-icon-danger {
+        @apply hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/15 dark:hover:text-red-400;
+    }
+
+    .link {
+        @apply font-medium text-brand-700 underline-offset-4 transition hover:text-brand-800 hover:underline dark:text-brand-300 dark:hover:text-brand-200;
+    }
+
+    /* ---- Surfaces ------------------------------------------------------- */
+    .card {
+        @apply rounded-2xl border border-gray-200/80 bg-white shadow-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-none;
+    }
+
+    .card-header {
+        @apply flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4 dark:border-slate-800 sm:px-6;
+    }
+
+    .card-title {
+        @apply text-base font-semibold text-navy-900 dark:text-slate-100;
+    }
+
+    .card-body {
+        @apply p-5 sm:p-6;
+    }
+
+    .card-footer {
+        @apply border-t border-gray-100 px-5 py-3 text-xs text-gray-500 dark:border-slate-800 dark:text-slate-400 sm:px-6;
+    }
+
+    /* ---- Tables --------------------------------------------------------- */
+    .table-base {
+        @apply min-w-full text-sm;
+    }
+
+    .table-base thead th {
+        @apply whitespace-nowrap bg-gray-50/80 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:bg-slate-800/50 dark:text-slate-400 first:ps-5 last:pe-5 sm:first:ps-6 sm:last:pe-6;
+    }
+
+    .table-base tbody td {
+        @apply border-t border-gray-100 px-4 py-3.5 align-middle text-gray-700 dark:border-slate-800 dark:text-slate-300 first:ps-5 last:pe-5 sm:first:ps-6 sm:last:pe-6;
+    }
+
+    .table-base tbody tr {
+        @apply transition-colors hover:bg-brand-50/40 dark:hover:bg-slate-800/50;
+    }
+
+    /*
+     * Observation report: every heading and cell centred both ways, the same
+     * padding on every row, long text wrapped in full (never cut off).
+     */
+    .table-report thead th,
+    .table-report tbody td {
+        @apply px-3 text-center align-middle first:ps-4 last:pe-4 sm:first:ps-5 sm:last:pe-5;
+    }
+
+    .table-report thead th {
+        @apply whitespace-normal py-3 leading-snug;
+    }
+
+    .table-report tbody td {
+        @apply h-14 py-3 leading-relaxed;
+    }
+
+    .table-report .cell-text {
+        @apply mx-auto block whitespace-pre-line break-words;
+    }
+
+    /* ---- Badges --------------------------------------------------------- */
+    .badge {
+        @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset;
+    }
+}
+
+/*
+ * Smooth page changes (cross-document View Transitions). Browsers without
+ * support simply navigate as before. The sidebar and top bar stay still;
+ * the page heading and content fade and rise slightly.
+ */
+@view-transition {
+    navigation: auto;
+}
+
+.vt-nav {
+    view-transition-name: site-nav;
+}
+
+.vt-topbar {
+    view-transition-name: site-topbar;
+}
+
+.vt-header {
+    view-transition-name: page-header;
+}
+
+.vt-content {
+    view-transition-name: page-content;
+}
+
+::view-transition-old(page-header),
+::view-transition-old(page-content) {
+    animation: 120ms ease-in both vt-fade-out;
+}
+
+::view-transition-new(page-header),
+::view-transition-new(page-content) {
+    animation: 220ms ease-out both vt-fade-in;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation-duration: 150ms;
+}
+
+@keyframes vt-fade-out {
+    to { opacity: 0; }
+}
+
+@keyframes vt-fade-in {
+    from { opacity: 0; transform: translateY(6px); }
+}
+
+/* Thin progress bar shown while the next page loads. */
+.page-progress {
+    @apply pointer-events-none fixed inset-x-0 top-0 z-[60] h-0.5 origin-left scale-x-0 bg-gradient-to-r from-brand-500 via-brand-400 to-accent-500 opacity-0;
+}
+
+.page-progress.is-active {
+    opacity: 1;
+    animation: progress-grow 8s cubic-bezier(0.1, 0.7, 0.2, 1) forwards;
+}
+
+@keyframes progress-grow {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(0.9); }
+}
+
+/*
+ * Theme switch: colours cross-fade only while the toggle is in use, so normal
+ * hover/focus transitions keep their own timing.
+ */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+    transition: background-color 300ms ease, border-color 300ms ease, color 300ms ease, fill 300ms ease,
+        stroke 300ms ease, box-shadow 300ms ease !important;
+}
+
+/* Spinner used by buttons in a loading state. */
+.spinner {
+    @apply inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    @view-transition {
+        navigation: none;
+    }
+
+    .page-progress.is-active {
+        animation: none;
+        transform: scaleX(0.9);
+    }
+
+    html.theme-transition,
+    html.theme-transition *,
+    html.theme-transition *::before,
+    html.theme-transition *::after {
+        transition: none !important;
+    }
+}
+
+/* A conditional field appearing (see .field-reveal). */
+@keyframes field-reveal {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
