@@ -1,21 +1,31 @@
 @php
     $user = Auth::user();
     $groups = [
-        'Menu Utama' => [
-            ['route' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'dashboard', 'active' => 'dashboard', 'show' => true],
-            ['route' => 'observations.index', 'label' => 'Laporan Observasi', 'icon' => 'clipboard', 'active' => ['observations.index', 'observations.show', 'observations.edit'], 'show' => $user->can('viewAny', App\Models\Observation::class)],
-            ['route' => 'observations.create', 'label' => 'Input Observasi', 'icon' => 'plus-circle', 'active' => 'observations.create*', 'show' => $user->can('create', App\Models\Observation::class)],
-        ],
-        'Master Data' => [
-            ['route' => ['indicators.show', ['category' => 'inm']], 'label' => 'Indikator', 'icon' => 'chart', 'active' => 'indicators.*', 'show' => $user->canViewAllUnits()],
-            ['route' => 'units.index', 'label' => 'Unit', 'icon' => 'building', 'active' => 'units.*', 'show' => $user->isAdmin()],
-            ['route' => 'indicator-unit-mappings.index', 'label' => 'Mapping Indikator & Unit', 'icon' => 'list', 'active' => 'indicator-unit-mappings.*', 'show' => $user->isAdmin()],
-            ['route' => 'hris-mappings.index', 'label' => 'Mapping Unit HRIS', 'icon' => 'users', 'active' => 'hris-mappings.*', 'show' => $user->isAdmin()],
-            ['route' => 'users.index', 'label' => 'Pengguna', 'icon' => 'users', 'active' => 'users.*', 'show' => $user->isAdmin()],
-            ['route' => 'jotform-import.index', 'label' => 'Impor Jotform', 'icon' => 'download', 'active' => 'jotform-import.*', 'show' => $user->isAdmin()],
-        ],
+        'menu-utama' => ['label' => 'Menu Utama', 'icon' => 'lucide-house', 'links' => [
+            ['route' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'lucide-layout-dashboard', 'active' => 'dashboard', 'show' => true],
+            ['route' => 'observations.create', 'label' => 'Input Observasi', 'icon' => 'lucide-clipboard-plus', 'active' => 'observations.create*', 'show' => $user->can('create', App\Models\Observation::class)],
+            ['route' => 'observations.index', 'label' => 'Laporan Observasi', 'icon' => 'lucide-clipboard-list', 'active' => ['observations.index', 'observations.show', 'observations.edit'], 'show' => $user->can('viewAny', App\Models\Observation::class)],
+        ]],
+        'master-data' => ['label' => 'Master Data', 'icon' => 'lucide-database', 'links' => [
+            ['route' => ['indicators.show', ['category' => 'inm']], 'label' => 'Indikator', 'icon' => 'lucide-chart-column', 'active' => 'indicators.*', 'show' => $user->canViewAllUnits()],
+            ['route' => 'units.index', 'label' => 'Unit', 'icon' => 'lucide-building-2', 'active' => 'units.*', 'show' => $user->isAdmin()],
+            ['route' => 'users.index', 'label' => 'Pengguna', 'icon' => 'lucide-users', 'active' => 'users.*', 'show' => $user->isAdmin()],
+        ]],
+        'integrasi-sistem' => ['label' => 'Integrasi Sistem', 'icon' => 'lucide-plug', 'links' => [
+            ['route' => 'indicator-unit-mappings.index', 'label' => 'Mapping Indikator & Unit', 'icon' => 'lucide-arrow-left-right', 'active' => 'indicator-unit-mappings.*', 'show' => $user->isAdmin()],
+            ['route' => 'hris-mappings.index', 'label' => 'Mapping Unit HRIS', 'icon' => 'lucide-network', 'active' => 'hris-mappings.*', 'show' => $user->isAdmin()],
+            ['route' => 'jotform-import.index', 'label' => 'Impor Jotform', 'icon' => 'lucide-import', 'active' => 'jotform-import.*', 'show' => $user->isAdmin()],
+        ]],
     ];
-    $groups = array_filter(array_map(fn ($links) => array_filter($links, fn ($link) => $link['show']), $groups));
+
+    // Only what this account may open; a group left without links disappears.
+    foreach ($groups as $key => $group) {
+        $groups[$key]['links'] = array_filter($group['links'], fn ($link) => $link['show']);
+        $groups[$key]['active'] = collect($groups[$key]['links'])->contains(fn ($link) => request()->routeIs(...(array) $link['active']));
+    }
+
+    $groups = array_filter($groups, fn ($group) => $group['links'] !== []);
+    $openGroup = array_key_first(array_filter($groups, fn ($group) => $group['active'])) ?? array_key_first($groups);
     $url = fn ($link) => is_array($link['route']) ? route(...$link['route']) : route($link['route']);
 @endphp
 
@@ -46,29 +56,56 @@
     </div>
 
     {{-- Links --}}
-    <nav class="flex-1 space-y-6 overflow-y-auto px-3 py-6">
-        @foreach ($groups as $group => $links)
+    <nav x-data="{ openGroup: @js($openGroup) }" class="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+        @foreach ($groups as $key => $group)
+            @php
+                $isOpen = $key === $openGroup;
+            @endphp
             <div>
-                <p class="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-navy-300/80">{{ $group }}</p>
-                <ul class="space-y-1">
-                    @foreach ($links as $link)
-                        @php($active = request()->routeIs(...(array) $link['active']))
-                        <li>
-                            <a href="{{ $url($link) }}" @if ($active) aria-current="page" @endif
-                                @class([
-                                    'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition',
-                                    'bg-white/10 text-white' => $active,
-                                    'text-navy-200 hover:bg-white/5 hover:text-white' => ! $active,
-                                ])>
-                                @if ($active)
-                                    <span class="absolute inset-y-2 -start-3 w-1 rounded-e-full bg-brand-500"></span>
-                                @endif
-                                <x-icon :name="$link['icon']" :class="$active ? 'h-5 w-5 text-brand-300' : 'h-5 w-5 text-navy-300 group-hover:text-white'" />
-                                {{ $link['label'] }}
-                            </a>
-                        </li>
-                    @endforeach
-                </ul>
+                <button type="button" id="nav-{{ $key }}" aria-controls="nav-{{ $key }}-links"
+                    aria-expanded="{{ $isOpen ? 'true' : 'false' }}"
+                    x-bind:aria-expanded="(openGroup === @js($key)).toString()"
+                    x-on:click="openGroup = openGroup === @js($key) ? null : @js($key)"
+                    @class([
+                        'group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-start text-sm font-medium transition hover:bg-white/5 hover:text-white',
+                        'text-white' => $group['active'],
+                        'text-navy-200' => ! $group['active'],
+                    ])>
+                    <x-icon :name="$group['icon']" :class="$group['active'] ? 'h-5 w-5 text-brand-300' : 'h-5 w-5 text-navy-300 group-hover:text-white'" />
+                    <span class="min-w-0 flex-1 truncate">{{ $group['label'] }}</span>
+                    <x-icon name="lucide-chevron-down" class="h-4 w-4 text-navy-300 transition-transform duration-200 group-hover:text-white group-aria-expanded:rotate-180 motion-reduce:transition-none" />
+                </button>
+
+                <div id="nav-{{ $key }}-links" role="region" aria-labelledby="nav-{{ $key }}"
+                    data-open="{{ $isOpen ? 'true' : 'false' }}"
+                    x-bind:data-open="(openGroup === @js($key)).toString()"
+                    x-bind:inert="openGroup !== @js($key)"
+                    @unless ($isOpen) inert @endunless
+                    class="grid grid-rows-[0fr] transition-[grid-template-rows] duration-200 ease-out data-[open=true]:grid-rows-[1fr] motion-reduce:transition-none">
+                    <div class="min-h-0 overflow-hidden">
+                        <ul class="my-1 ms-[1.375rem] space-y-1 border-s border-white/10 ps-2.5">
+                            @foreach ($group['links'] as $link)
+                                @php
+                                    $active = request()->routeIs(...(array) $link['active']);
+                                @endphp
+                                <li>
+                                    <a href="{{ $url($link) }}" @if ($active) aria-current="page" @endif
+                                        @class([
+                                            'group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition',
+                                            'bg-white/10 text-white' => $active,
+                                            'text-navy-200 hover:bg-white/5 hover:text-white' => ! $active,
+                                        ])>
+                                        @if ($active)
+                                            <span class="absolute inset-y-2 -start-[11px] w-1 rounded-e-full bg-brand-500"></span>
+                                        @endif
+                                        <x-icon :name="$link['icon']" :class="$active ? 'h-[18px] w-[18px] text-brand-300' : 'h-[18px] w-[18px] text-navy-300 group-hover:text-white'" />
+                                        <span class="min-w-0 truncate">{{ $link['label'] }}</span>
+                                    </a>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                </div>
             </div>
         @endforeach
     </nav>
