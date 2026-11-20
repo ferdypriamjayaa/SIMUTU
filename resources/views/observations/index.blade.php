@@ -16,7 +16,7 @@
     <div class="space-y-6">
         <x-flash />
 
-        @if ($user->isPicUnit() && ! $user->unit_id)
+        @if (! $user->canViewAllUnits() && ! $user->unit_id)
             <x-alert type="warning">
                 Akun Anda belum terhubung dengan unit, sehingga belum ada data yang dapat ditampilkan. Hubungi administrator.
             </x-alert>
@@ -132,14 +132,14 @@
                             </div>
                         </dl>
 
-                        @can('export', App\Models\Observation::class)
+                        @can('export', [App\Models\Observation::class, $report->indicator])
                             <div class="flex gap-2">
-                                <x-button variant="secondary" size="sm" :href="route('observations.export', ['format' => 'excel', ...$report->query()])" icon="download" data-no-progress>
-                                    Excel
-                                </x-button>
-                                <x-button variant="secondary" size="sm" :href="route('observations.export', ['format' => 'pdf', ...$report->query()])" icon="document" data-no-progress>
-                                    PDF
-                                </x-button>
+                                    <x-button variant="secondary" size="sm" :href="route('observations.export', ['format' => 'excel', ...$report->query()])" icon="download" data-no-progress>
+                                        Excel
+                                    </x-button>
+                                    <x-button variant="secondary" size="sm" :href="route('observations.export', ['format' => 'pdf', ...$report->query()])" icon="document" data-no-progress>
+                                        PDF
+                                    </x-button>
                             </div>
                         @endcan
                     </div>

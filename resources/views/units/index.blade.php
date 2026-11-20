@@ -2,6 +2,7 @@
     <div class="space-y-6">
         <x-flash />
 
+        @can('units.create')
         <x-card title="Tambah Unit" icon="plus-circle">
             <form action="{{ route('units.store') }}" method="POST"
                 class="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto] sm:items-end">
@@ -18,6 +19,7 @@
                 <x-button icon="plus" loading-text="Menyimpan…">Tambah Unit</x-button>
             </form>
         </x-card>
+        @endcan
 
         <x-card title="Daftar Unit" :description="$units->count().' unit terdaftar'" icon="building" :padded="false">
             <ul class="divide-y divide-gray-100 dark:divide-slate-800">
@@ -30,6 +32,7 @@
                             <x-badge :color="$unit->is_active ? 'green' : 'gray'" dot>{{ $unit->is_active ? 'Aktif' : 'Tidak Aktif' }}</x-badge>
 
                             <div class="flex items-center gap-1">
+                                @can('units.edit')
                                 <button type="button" @click="editing = ! editing" class="btn-icon" title="Ubah kode/nama" aria-label="Ubah {{ $unit->name }}"
                                     :class="editing && 'bg-gray-100 dark:bg-slate-800 text-navy-900 dark:text-slate-100'">
                                     <x-icon name="pencil" class="h-[18px] w-[18px]" />
@@ -43,13 +46,17 @@
                                         <x-icon name="power" :class="$unit->is_active ? 'h-[18px] w-[18px]' : 'h-[18px] w-[18px] text-accent-600 dark:text-accent-300'" />
                                     </button>
                                 </form>
+                                @endcan
 
+                                @can('units.delete')
                                 <x-delete-form :action="route('units.destroy', ['unit' => $unit->id])"
                                     :confirm="'Yakin ingin menghapus unit '.$unit->name.'? Tindakan ini tidak dapat dibatalkan.'" />
+                                @endcan
                             </div>
                         </div>
 
                         {{-- Inline edit --}}
+                        @can('units.edit')
                         <form x-show="editing" x-cloak x-transition.opacity action="{{ route('units.update', ['unit' => $unit->id]) }}" method="POST"
                             class="mt-3 grid grid-cols-1 gap-3 rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50/70 dark:bg-slate-800/40 p-3 sm:grid-cols-[8rem_minmax(0,1fr)_auto_auto]">
                             @csrf
@@ -66,6 +73,7 @@
                             <x-button variant="secondary" type="button" class="h-10" x-on:click="editing = false">Batal</x-button>
                             <x-button class="h-10" loading-text="Menyimpan…">Simpan</x-button>
                         </form>
+                        @endcan
                     </li>
                 @empty
                     <li>

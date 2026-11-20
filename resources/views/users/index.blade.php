@@ -1,7 +1,9 @@
-<x-app-layout title="Master Pengguna">
-    <x-slot name="actions">
-        <x-button :href="route('users.create')" icon="plus">Tambah Pengguna</x-button>
-    </x-slot>
+<x-app-layout title="Manajemen Pengguna">
+    @can('users.create')
+        <x-slot name="actions">
+            <x-button :href="route('users.create')" icon="plus">Tambah Pengguna</x-button>
+        </x-slot>
+    @endcan
 
     <div class="space-y-6">
         <x-flash />
@@ -35,8 +37,8 @@
                 <x-form.field label="Jabatan" for="role">
                     <x-form.select name="role">
                         <option value="">Semua Jabatan</option>
-                        @foreach (\App\Models\User::ROLES as $value => $label)
-                            <option value="{{ $value }}" @selected($role === $value)>{{ $label }}</option>
+                        @foreach ($roles as $item)
+                            <option value="{{ $item->slug }}" @selected($role === $item->slug)>{{ $item->name }}{{ $item->is_active ? '' : ' (nonaktif)' }}</option>
                         @endforeach
                     </x-form.select>
                 </x-form.field>
@@ -122,12 +124,16 @@
                                     <x-badge :color="$user->is_active ? 'green' : 'gray'" dot>{{ $user->is_active ? 'Aktif' : 'Nonaktif' }}</x-badge>
                                 </td>
                                 <td>
+                                    @php($manageable = App\Support\AccessGuard::canManageUser(Auth::user(), $user))
                                     <div class="flex items-center justify-end gap-1">
-                                        <a href="{{ route('users.edit', $user) }}" class="btn-icon" title="Edit" aria-label="Edit {{ $user->name }}">
-                                            <x-icon name="pencil" class="h-[18px] w-[18px]" />
-                                        </a>
+                                        @if ($manageable && Auth::user()->can('users.edit'))
+                                            <a href="{{ route('users.edit', $user) }}" class="btn-icon" title="Edit" aria-label="Edit {{ $user->name }}">
+                                                <x-icon name="pencil" class="h-[18px] w-[18px]" />
+                                            </a>
+                                        @endif
 
-                                        @unless ($user->is(Auth::user()))
+                                        @if ($manageable && ! $user->is(Auth::user()))
+                                            @can('users.edit')
                                             <form action="{{ route('users.toggle-status', $user) }}" method="POST" class="inline">
                                                 @csrf
                                                 @method('PATCH')
@@ -136,10 +142,13 @@
                                                     <x-icon name="power" :class="$user->is_active ? 'h-[18px] w-[18px]' : 'h-[18px] w-[18px] text-accent-600 dark:text-accent-300'" />
                                                 </button>
                                             </form>
+                                            @endcan
 
-                                            <x-delete-form :action="route('users.destroy', $user)"
-                                                :confirm="'Yakin ingin menghapus akun '.$user->name.'? Tindakan ini tidak dapat dibatalkan.'" />
-                                        @endunless
+                                            @can('users.delete')
+                                                <x-delete-form :action="route('users.destroy', $user)"
+                                                    :confirm="'Yakin ingin menghapus akun '.$user->name.'? Tindakan ini tidak dapat dibatalkan.'" />
+                                            @endcan
+                                        @endif
                                     </div>
                                 </td>
                             </tr>

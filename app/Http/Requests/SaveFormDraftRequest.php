@@ -25,7 +25,7 @@ class SaveFormDraftRequest extends FormRequest
 
     public function authorize(): bool
     {
-        if (! $this->user()?->isAdmin()) {
+        if (! $this->user()?->hasPermission('indicators.edit')) {
             return false;
         }
 

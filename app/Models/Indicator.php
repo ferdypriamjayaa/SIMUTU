@@ -129,6 +129,14 @@ class Indicator extends Model
     }
 
     /**
+     * Indicators of the categories the user may record (inm.create / imp.create).
+     */
+    public function scopeCreatableBy(Builder $query, User $user): Builder
+    {
+        return $query->whereHas('category', fn (Builder $c) => $c->whereIn('code', $user->categoryCodes('create')));
+    }
+
+    /**
      * Indicators assigned to the given unit.
      */
     public function scopeAssignedTo(Builder $query, ?int $unitId): Builder
@@ -139,18 +147,21 @@ class Indicator extends Model
     /**
      * Indicators the user can report on: those with observations they may
      * see (historical data stays reachable after assignments change), plus
-     * active indicators in their scope — every one for Admin and PIC Mutu,
-     * only their unit's assignments for PIC Unit.
+     * active indicators in their scope — every one with data.view_all_units,
+     * otherwise only their unit's assignments.
      */
     public function scopeReportableFor(Builder $query, User $user): Builder
     {
         // Every category (INM, IMP RS, IMP Unit): a report needs a form, not input access.
+        // Only categories of the user's view permissions (inm.view / imp.view).
+        $query->whereHas('category', fn (Builder $c) => $c->whereIn('code', $user->categoryCodes('view')));
+
         return $query->withReportForm()->where(function (Builder $q) use ($user) {
             $q->whereHas('observations', fn (Builder $o) => $o->visibleTo($user));
 
             if ($user->canViewAllUnits()) {
                 $q->orWhere('is_active', true);
-            } elseif ($user->isPicUnit() && $user->unit_id) {
+            } elseif ($user->unit_id) {
                 $q->orWhere(fn (Builder $a) => $a->where('is_active', true)->assignedTo($user->unit_id));
             }
         });

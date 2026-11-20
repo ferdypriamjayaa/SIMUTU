@@ -3,6 +3,7 @@ import './bootstrap';
 import Alpine from 'alpinejs';
 import formBuilder from './form-builder';
 import userHrisPicker from './user-hris-picker';
+import permissionTree from './permission-tree';
 import initHrisMapping from './hris-mapping';
 import combobox from './combobox';
 import dialog from './dialog';
@@ -13,6 +14,7 @@ window.Alpine = Alpine;
 
 Alpine.data('formBuilder', formBuilder);
 Alpine.data('userHrisPicker', userHrisPicker);
+Alpine.data('permissionTree', permissionTree);
 Alpine.data('combobox', combobox);
 Alpine.data('dialog', dialog);
 // Page scroll lock without the sideways jump of a disappearing scrollbar (modals).

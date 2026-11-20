@@ -305,6 +305,7 @@ class ObservationReportPageTest extends TestCase
             ->assertDontSee($export('excel'));
 
         // Roles without access to observations never get the report.
+        \App\Models\Role::create(['slug' => 'tamu', 'name' => 'Tamu']);
         $this->actingAs(User::factory()->create(['role' => 'tamu']))->get(route('observations.index'))->assertForbidden();
     }
 

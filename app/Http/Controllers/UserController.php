@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Role;
 use App\Models\Unit;
 use App\Models\User;
 use App\Services\EmployeeService;
 use App\Services\HrisException;
+use App\Support\AccessGuard;
+use App\Support\Permissions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,7 +18,9 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
- * Account management. Routes are restricted to administrators.
+ * Account management. Each route requires its users.* permission; accounts
+ * holding the system role (Admin) are managed by Admin only, and permission
+ * overrides need permissions.manage (see AccessGuard).
  */
 class UserController extends Controller
 {
@@ -24,15 +29,16 @@ class UserController extends Controller
     public function index(Request $request): View
     {
         $units = Unit::orderBy('name')->get(['id', 'name', 'is_active']);
+        $roles = Role::orderByDesc('is_system')->orderBy('name')->get(['slug', 'name', 'is_active']);
 
         // Unknown values in the address are ignored rather than showing an empty list.
         $search = trim((string) $request->query('search'));
-        $role = array_key_exists((string) $request->query('role'), User::ROLES) ? (string) $request->query('role') : '';
+        $role = $roles->contains('slug', (string) $request->query('role')) ? (string) $request->query('role') : '';
         $unit = $units->firstWhere('id', filter_var($request->query('unit_id'), FILTER_VALIDATE_INT));
         $sort = in_array($request->query('sort'), ['name', 'role', 'unit'], true) ? $request->query('sort') : 'name';
         $direction = $request->query('direction') === 'desc' ? 'desc' : 'asc';
 
-        $query = User::with('unit')
+        $query = User::with(['unit', 'assignedRole'])
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
                     $query->where('name', 'like', "%{$search}%")
@@ -44,9 +50,7 @@ class UserController extends Controller
             ->when($unit, fn ($query) => $query->where('unit_id', $unit->id));
 
         match ($sort) {
-            'role' => $query->orderByRaw(
-                "case role when 'admin' then 0 when 'pic_mutu' then 1 when 'pic_unit' then 2 else 3 end {$direction}"
-            ),
+            'role' => $query->orderBy(Role::select('name')->whereColumn('roles.slug', 'users.role'), $direction),
             // Accounts without a unit stay at the end in both directions.
             'unit' => $query->orderByRaw('unit_id is null')
                 ->orderBy(Unit::select('name')->whereColumn('units.id', 'users.unit_id'), $direction),
@@ -65,26 +69,31 @@ class UserController extends Controller
             'sort' => $sort,
             'direction' => $direction,
             'units' => $units,
+            'roles' => $roles,
             'filtered' => $search !== '' || $role !== '' || $unit !== null,
             'missingNipCount' => User::whereNull('nip')->count(),
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
+        $user = new User(['role' => User::ROLE_PIC_UNIT, 'is_active' => true]);
+
         return view('users.form', [
-            'user' => new User(['role' => User::ROLE_PIC_UNIT, 'is_active' => true]),
+            'user' => $user,
             'units' => $this->unitOptions(),
             'hris' => $this->hrisPicker(),
+            ...$this->accessOptions($request->user(), $user),
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
         $validated = $this->validateUser($request);
+        $this->ensureAccessAllowed($request, $validated);
         $hris = $this->hrisLink($request, $validated);
 
-        User::create([
+        $user = User::create([
             'nip' => $validated['nip'],
             'name' => $validated['name'],
             'email' => $validated['email'] ?? null,
@@ -95,29 +104,37 @@ class UserController extends Controller
             ...$hris,
         ]);
 
+        $this->saveOverrides($request, $user, $validated);
+
         return redirect()
             ->route('users.index')
             ->with('success', 'Akun pengguna berhasil ditambahkan.');
     }
 
-    public function edit(User $user): View
+    public function edit(Request $request, User $user): View
     {
+        $this->ensureCanManage($request, $user);
+
         return view('users.form', [
             'user' => $user,
             'units' => $this->unitOptions($user->unit_id),
             'hris' => $this->hrisPicker($user),
+            ...$this->accessOptions($request->user(), $user),
         ]);
     }
 
     public function update(Request $request, User $user): RedirectResponse
     {
+        $this->ensureCanManage($request, $user);
         $validated = $this->validateUser($request, $user);
 
-        if ($user->is($request->user()) && $validated['role'] !== User::ROLE_ADMIN) {
+        if ($user->is($request->user()) && $validated['role'] !== $user->role) {
             return back()
                 ->withInput()
-                ->withErrors(['role' => 'Anda tidak dapat menurunkan jabatan akun Anda sendiri.']);
+                ->withErrors(['role' => 'Anda tidak dapat mengubah atau menurunkan jabatan akun Anda sendiri.']);
         }
+
+        $this->ensureAccessAllowed($request, $validated, $user);
 
         $attributes = [
             'nip' => $validated['nip'],
@@ -134,6 +151,7 @@ class UserController extends Controller
         }
 
         $user->update($attributes);
+        $this->saveOverrides($request, $user, $validated);
 
         return redirect()
             ->route('users.index')
@@ -142,6 +160,8 @@ class UserController extends Controller
 
     public function toggleStatus(Request $request, User $user): RedirectResponse
     {
+        $this->ensureCanManage($request, $user);
+
         if ($user->is($request->user())) {
             return back()->with('error', 'Anda tidak dapat menonaktifkan akun Anda sendiri.');
         }
@@ -157,6 +177,8 @@ class UserController extends Controller
      */
     public function destroy(Request $request, User $user): RedirectResponse
     {
+        $this->ensureCanManage($request, $user);
+
         if ($user->is($request->user())) {
             return back()->with('error', 'Anda tidak dapat menghapus akun Anda sendiri.');
         }
@@ -201,9 +223,14 @@ class UserController extends Controller
                 'max:255',
                 Rule::unique('users', 'email')->ignore($user?->id),
             ],
-            'role' => ['required', Rule::in(array_keys(User::ROLES))],
+            // Active roles, or the account's current role even if it was deactivated since.
+            'role' => ['required', 'string', Rule::exists('roles', 'slug')->where(function ($query) use ($user) {
+                $query->where('is_active', true)->when($user?->role, fn ($q, $role) => $q->orWhere('slug', $role));
+            })],
+            'overrides' => ['nullable', 'array'],
+            'overrides.*' => ['string', Rule::in(['inherit', 'allow', 'deny'])],
             'unit_id' => [
-                Rule::requiredIf($request->input('role') === User::ROLE_PIC_UNIT),
+                Rule::requiredIf(fn () => $this->needsUnit($request, $user)),
                 'nullable',
                 'integer',
                 // An existing assignment may stay even if the unit was later deactivated.
@@ -219,7 +246,7 @@ class UserController extends Controller
             ],
         ], [
             'nip.regex' => $fromHris ? 'NIP hanya boleh berisi huruf dan angka.' : 'NIP hanya boleh berisi angka.',
-            'unit_id.required' => 'Unit wajib dipilih untuk akun PIC Unit.',
+            'unit_id.required' => 'Unit wajib dipilih untuk jabatan yang hanya dapat melihat data unitnya sendiri (seperti PIC Unit).',
         ], [
             'nip' => 'NIP',
             'name' => 'Nama',
@@ -364,6 +391,152 @@ class UserController extends Controller
             'hris_company_code' => $employee['company'],
             'hris_linked_at' => $unchanged ? $user->hris_linked_at : now(),
         ];
+    }
+
+    /**
+     * Role choices and the permission-override editor for the account form.
+     *
+     * @return array<string, mixed>
+     */
+    private function accessOptions(User $actor, User $user): array
+    {
+        $roles = Role::with('permissions')
+            ->where(fn ($q) => $q->where('is_active', true)->when($user->role, fn ($q, $slug) => $q->orWhere('slug', $slug)))
+            ->orderByDesc('is_system')->orderBy('name')
+            ->get();
+
+        return [
+            'roles' => $roles->map(fn (Role $role) => [
+                'slug' => $role->slug,
+                'name' => $role->name.($role->is_active ? '' : ' (nonaktif)'),
+                'system' => $role->is_system,
+                'active' => $role->is_active,
+                'permissions' => $role->is_system ? Permissions::all() : $role->permissionKeys(),
+                'assignable' => $role->slug === $user->role || AccessGuard::canAssignRole($actor, $role),
+            ])->values()->all(),
+            'overrides' => $user->exists ? $user->permissionOverrides->pluck('is_granted', 'permission')->all() : [],
+            'canOverride' => $this->canOverride($actor, $user),
+            'grantable' => array_values(array_diff(Permissions::all(), AccessGuard::ungrantable($actor, Permissions::all()))),
+        ];
+    }
+
+    /**
+     * Overrides are set by holders of permissions.manage, never on their own account.
+     */
+    private function canOverride(User $actor, User $user): bool
+    {
+        return $actor->hasPermission('permissions.manage') && ! ($user->exists && $user->is($actor));
+    }
+
+    private function ensureCanManage(Request $request, User $user): void
+    {
+        abort_unless(
+            AccessGuard::canManageUser($request->user(), $user),
+            403,
+            'Akun dengan jabatan sistem hanya dapat dikelola oleh Admin.'
+        );
+    }
+
+    /**
+     * The chosen role and the submitted overrides must stay within what the
+     * actor holds, so nobody can hand out more access than they have.
+     *
+     * @param  array<string, mixed>  $validated
+     *
+     * @throws ValidationException
+     */
+    private function ensureAccessAllowed(Request $request, array $validated, ?User $user = null): void
+    {
+        $actor = $request->user();
+
+        if ($validated['role'] !== $user?->role) {
+            $role = Role::with('permissions')->where('slug', $validated['role'])->firstOrFail();
+
+            if (! AccessGuard::canAssignRole($actor, $role)) {
+                throw ValidationException::withMessages(['role' => $role->is_system
+                    ? 'Hanya Admin yang dapat memberikan jabatan sistem.'
+                    : 'Anda tidak dapat memberikan jabatan yang izinnya melebihi izin Anda sendiri.']);
+            }
+        }
+
+        if (! $this->canOverride($actor, $user ?? new User)) {
+            return;
+        }
+
+        $current = $user?->permissionOverrides->pluck('is_granted', 'permission')->all() ?? [];
+        $denied = [];
+
+        foreach ($this->submittedOverrides($request) as $permission => $granted) {
+            // A grant that is new must be one the actor holds; an existing one may stay.
+            if ($granted && ($current[$permission] ?? null) !== true && ! AccessGuard::canGrant($actor, $permission)) {
+                $denied[] = Permissions::label($permission);
+            }
+        }
+
+        if ($denied !== []) {
+            throw ValidationException::withMessages([
+                'overrides' => 'Anda tidak dapat memberikan izin yang tidak Anda miliki: '.implode(', ', $denied).'.',
+            ]);
+        }
+    }
+
+    /**
+     * Explicit overrides from the form: permission => true (allow) / false (deny).
+     * Unknown permissions and "inherit" are dropped.
+     *
+     * @return array<string, bool>
+     */
+    private function submittedOverrides(Request $request): array
+    {
+        $result = [];
+
+        foreach ((array) $request->input('overrides', []) as $permission => $value) {
+            if (is_string($permission) && Permissions::exists($permission) && in_array($value, ['allow', 'deny'], true)) {
+                $result[$permission] = $value === 'allow';
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function saveOverrides(Request $request, User $user, array $validated): void
+    {
+        if (! $this->canOverride($request->user(), $user) || ! $request->has('overrides')) {
+            return;
+        }
+
+        $overrides = $this->submittedOverrides($request);
+
+        $user->permissionOverrides()->whereNotIn('permission', array_keys($overrides))->delete();
+
+        foreach ($overrides as $permission => $granted) {
+            $user->permissionOverrides()->updateOrCreate(['permission' => $permission], ['is_granted' => $granted]);
+        }
+
+        $user->forgetPermissions();
+    }
+
+    /**
+     * A unit is required when the resulting account only sees its own unit's data.
+     */
+    private function needsUnit(Request $request, ?User $user): bool
+    {
+        $role = Role::with('permissions')->where('slug', (string) $request->input('role'))->first();
+
+        if ($role === null) {
+            return false;
+        }
+
+        $overrides = $this->canOverride($request->user(), $user ?? new User) && $request->has('overrides')
+            ? $this->submittedOverrides($request)
+            : ($user?->permissionOverrides->pluck('is_granted', 'permission')->all() ?? []);
+
+        $matrix = Permissions::resolve($role->permissionKeys(), $overrides, $role->is_system, $role->is_active);
+
+        return ! $matrix[Permissions::VIEW_ALL_UNITS]['effective'];
     }
 
     private function unitOptions(?int $currentUnitId = null)

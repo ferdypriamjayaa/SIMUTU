@@ -65,6 +65,11 @@ class UserFactory extends Factory
         ]);
     }
 
+    public function validator(): static
+    {
+        return $this->state(fn (array $attributes) => ['role' => User::ROLE_VALIDATOR]);
+    }
+
     public function inactive(): static
     {
         return $this->state(fn (array $attributes) => ['is_active' => false]);

@@ -115,21 +115,35 @@
                 </div>
             </fieldset>
 
-            <fieldset class="space-y-5">
+            @php($permissionState = collect(App\Support\Permissions::all())->mapWithKeys(fn ($p) => [$p => old("overrides.$p", array_key_exists($p, $overrides) ? ($overrides[$p] ? 'allow' : 'deny') : 'inherit')])->all())
+            @php($overrideCount = count(array_filter($permissionState, fn ($v) => $v !== 'inherit')))
+            {{-- Effective permissions are recomputed here as the role or overrides change; the server applies the same rules (App\Support\Permissions). --}}
+            <fieldset class="space-y-5" x-data="permissionTree(@js([
+                'mode' => 'user',
+                'role' => old('role', $user->role),
+                'roles' => collect($roles)->keyBy('slug'),
+                'overrides' => $permissionState,
+                'grantable' => $grantable,
+                'editable' => $canOverride,
+                'leaves' => App\Support\Permissions::leavesByNode(),
+                'open' => array_fill_keys(array_column(App\Support\Permissions::TREE, 'key'), true),
+            ]))">
                 <legend class="mb-4 flex items-center gap-3 text-sm font-semibold text-navy-900 dark:text-slate-100">
                     <span class="h-4 w-1 rounded-full bg-brand-500"></span> Akses
                 </legend>
 
                 <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
                     <x-form.field label="Jabatan" for="role" required>
-                        <x-form.select name="role" required>
-                            @foreach (App\Models\User::ROLES as $value => $label)
-                                <option value="{{ $value }}" @selected(old('role', $user->role) === $value)>{{ $label }}</option>
+                        <x-form.select name="role" required x-model="role">
+                            @foreach ($roles as $item)
+                                <option value="{{ $item['slug'] }}" @selected(old('role', $user->role) === $item['slug']) @disabled(! $item['assignable'])>
+                                    {{ $item['name'] }}{{ $item['assignable'] ? '' : ' (melebihi izin Anda)' }}
+                                </option>
                             @endforeach
                         </x-form.select>
                     </x-form.field>
 
-                    <x-form.field label="Unit" for="unit_id" hint="Wajib untuk PIC Unit.">
+                    <x-form.field label="Unit" for="unit_id" hint="Wajib untuk jabatan yang hanya melihat data unitnya sendiri (seperti PIC Unit).">
                         <x-form.select name="unit_id">
                             <option value="">— Tanpa unit —</option>
                             @foreach ($units as $unit)
@@ -140,6 +154,33 @@
                         </x-form.select>
                     </x-form.field>
                 </div>
+
+                @php($selectedRole = collect($roles)->firstWhere('slug', old('role', $user->role)))
+                @php($initialOn = $selectedRole ? array_keys(array_filter(App\Support\Permissions::resolve($selectedRole['permissions'], array_map(fn ($v) => $v === 'allow', array_filter($permissionState, fn ($v) => $v !== 'inherit')), $selectedRole['system'], $selectedRole['active']), fn ($p) => $p['effective'])) : [])
+                <details class="rounded-xl border border-gray-200 dark:border-slate-800" @if ($errors->has('overrides') || $errors->has('overrides.*') || $overrideCount > 0) open @endif>
+                    <summary class="flex cursor-pointer flex-wrap items-center gap-2 px-4 py-3 text-sm font-semibold text-navy-900 dark:text-slate-100">
+                        <x-icon name="key" class="h-4 w-4 text-brand-600 dark:text-brand-300" />
+                        Izin Pengguna
+                        <span class="font-normal text-gray-500 dark:text-slate-400">
+                            · <span x-text="summary.effective">{{ count($initialOn) }}</span> izin efektif
+                            · <span class="text-accent-700 dark:text-accent-300"><span x-text="summary.added"></span> ditambahkan</span>
+                            · <span class="text-red-700 dark:text-red-300"><span x-text="summary.restricted"></span> dibatasi</span>
+                        </span>
+                    </summary>
+
+                    <div class="space-y-3 border-t border-gray-100 px-4 py-4 dark:border-slate-800">
+                        @unless ($canOverride)
+                            <x-alert type="info">
+                                {{ $user->exists && $user->is(Auth::user()) ? 'Izin khusus akun Anda sendiri tidak dapat diubah dari sini.' : 'Anda tidak memiliki izin untuk mengatur izin khusus pengguna. Daftar ini hanya untuk dilihat.' }}
+                            </x-alert>
+                        @endunless
+                        <p x-show="current?.system" x-cloak class="form-hint text-amber-700 dark:text-amber-400">Jabatan sistem selalu memiliki semua izin; izin khusus tidak berlaku.</p>
+                        <x-input-error :messages="$errors->get('overrides')" />
+                        <x-input-error :messages="$errors->get('overrides.*')" />
+
+                        <x-permission-tree mode="user" :editable="$canOverride" :on="$initialOn" :state="$permissionState" />
+                    </div>
+                </details>
             </fieldset>
 
             <fieldset class="space-y-5">

@@ -1,8 +1,9 @@
-@php($manageable = in_array($category->code, ['IMP_RS', 'IMP_UNIT']) && Auth::user()->isAdmin())
-@php($isAdmin = Auth::user()->isAdmin())
+@php($imp = in_array($category->code, ['IMP_RS', 'IMP_UNIT']))
+@php($manageable = $imp && Auth::user()->can('indicators.edit'))
+@php($canEditForms = Auth::user()->can('indicators.edit'))
 
 <x-app-layout :title="$categoryName">
-    @if ($manageable)
+    @if ($imp && Auth::user()->can('indicators.create'))
         <x-slot name="actions">
             <x-button :href="route('indicators.create', ['category' => $category->slug])" icon="plus">Tambah Indikator</x-button>
         </x-slot>
@@ -43,14 +44,14 @@
                                     @else
                                         <x-badge color="gray">Belum ada formulir terbit</x-badge>
                                     @endif
-                                    @if ($isAdmin && $indicator->draftFormVersion)
+                                    @if ($canEditForms && $indicator->draftFormVersion)
                                         <x-badge color="amber">Draf v{{ $indicator->draftFormVersion->version }}</x-badge>
                                     @endif
                                 </div>
                             </div>
                         </div>
 
-                        @if ($isAdmin)
+                        @if ($canEditForms)
                             <div class="flex items-center gap-1">
                                 <x-button variant="secondary" size="sm" icon="clipboard" :href="route('form-builder.show', $indicator)">Formulir</x-button>
                         @endif
@@ -71,11 +72,13 @@
                                     </button>
                                 </form>
 
+                                @can('indicators.delete')
                                 <x-delete-form :action="route('indicators.destroy', ['category' => $category->slug, 'indicator' => $indicator->id])"
                                     confirm="Yakin ingin menghapus indikator ini?" />
+                                @endcan
                         @endif
 
-                        @if ($isAdmin)
+                        @if ($canEditForms)
                             </div>
                         @endif
                     </li>

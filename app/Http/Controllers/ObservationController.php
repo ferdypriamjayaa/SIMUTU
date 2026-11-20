@@ -71,7 +71,7 @@ class ObservationController extends Controller
         return view('observations.index', [
             'report' => $report,
             'result' => $result,
-            'categories' => collect(ReportFilters::CATEGORIES)->map(fn (array $c, string $slug) => [
+            'categories' => collect(ReportFilters::categoriesFor($user))->map(fn (array $c, string $slug) => [
                 'label' => $c['label'],
                 'count' => ReportFilters::indicators($user, $slug)->count(),
             ]),
@@ -93,15 +93,15 @@ class ObservationController extends Controller
             );
 
             abort_unless(
-                $this->assignableIndicators($unit->id)->whereKey($indicator->id)->exists(),
+                $this->assignableIndicators($request->user(), $unit->id)->whereKey($indicator->id)->exists(),
                 403,
-                'Indikator ini tidak ditetapkan untuk unit Anda.'
+                'Indikator ini tidak ditetapkan untuk unit Anda, atau kategorinya (INM/IMP) tidak termasuk izin Anda.'
             );
         }
 
         $version = $indicator?->publishedFormVersion()->with('fields.options')->first();
         $category = $this->categoryFilter($request);
-        $all = $this->unitIndicators($unit->id);
+        $all = $this->unitIndicators($request->user(), $unit->id);
 
         return view('observations.create', [
             'indicator' => $indicator,
@@ -111,7 +111,11 @@ class ObservationController extends Controller
             'doctors' => $version ? $this->doctorPicker->forForm($indicator, $version, $unit) : [],
             'indicators' => $category === self::ALL_CATEGORIES ? $all : $all->filter(fn (Indicator $i) => $i->category?->slug === $category)->values(),
             'category' => $category,
-            'categoryTabs' => collect(self::CATEGORY_TABS)->map(fn (string $label, string $slug) => [
+            // Tabs of categories the user may record, plus "Semua".
+            'categoryTabs' => collect(self::CATEGORY_TABS)
+                ->filter(fn (string $label, string $slug) => $slug === self::ALL_CATEGORIES
+                    || in_array(ReportFilters::CATEGORIES[$slug]['code'] ?? null, $request->user()->categoryCodes('create'), true))
+                ->map(fn (string $label, string $slug) => [
                 'label' => $label,
                 'count' => $slug === self::ALL_CATEGORIES ? $all->count() : $all->where('category.slug', $slug)->count(),
             ]),
@@ -142,7 +146,7 @@ class ObservationController extends Controller
             'indicator_id' => [
                 'required',
                 'integer',
-                Rule::in($this->assignableIndicators($request->user()->activeUnit()->id)->pluck('id')->all()),
+                Rule::in($this->assignableIndicators($request->user(), $request->user()->activeUnit()->id)->pluck('id')->all()),
             ],
         ], [
             'indicator_id.in' => 'Indikator tidak aktif, belum memiliki formulir terbit, atau tidak ditetapkan untuk unit Anda.',
@@ -286,6 +290,7 @@ class ObservationController extends Controller
         Gate::authorize('export', Observation::class);
 
         $report = ReportFilters::fromRequest($request, complete: true);
+        Gate::authorize('export', [Observation::class, $report->indicator]);
         $query = $this->query($request->user(), $report->scope());
         $filename = 'laporan-'.Str::slug(Str::limit($report->indicator->name, 60, '')).'-'.now()->format('Ymd-His');
 
@@ -324,9 +329,9 @@ class ObservationController extends Controller
      * Active INM and IMP RS indicators mapped to the unit (indicator_unit)
      * with a published form: the ones it can record.
      */
-    private function assignableIndicators(int $unitId): Builder
+    private function assignableIndicators(User $user, int $unitId): Builder
     {
-        return Indicator::observable()->assignedTo($unitId);
+        return Indicator::observable()->assignedTo($unitId)->creatableBy($user);
     }
 
     /**
@@ -339,11 +344,12 @@ class ObservationController extends Controller
      *
      * @return \Illuminate\Support\Collection<int, Indicator>
      */
-    private function unitIndicators(int $unitId): \Illuminate\Support\Collection
+    private function unitIndicators(User $user, int $unitId): \Illuminate\Support\Collection
     {
         return Indicator::query()
             ->where('is_active', true)
             ->assignedTo($unitId)
+            ->creatableBy($user)
             ->with(['category', 'publishedFormVersion:id,indicator_id,version'])
             ->orderBy('indicator_category_id')
             ->orderBy('name')

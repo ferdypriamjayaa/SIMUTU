@@ -9,10 +9,10 @@ use App\Http\Controllers\ObservationController;
 use App\Http\Controllers\ObservationLookupController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicSurveyController;
+use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SimutuController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\UserController;
-use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -44,13 +44,15 @@ Route::post('/survei-kepuasan-pasien', [PublicSurveyController::class, 'store'])
 
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [SimutuController::class, 'index'])
+        ->middleware('can:dashboard.view')
         ->name('dashboard');
 
     /*
     |--------------------------------------------------------------------------
     | Transaksi Observasi
     |--------------------------------------------------------------------------
-    | Akses per peran diatur oleh ObservationPolicy.
+    | Menu: observations.create / reports.view. Kategori: inm.* / imp.* (IMP RS) / imp_unit.*
+    | (ObservationPolicy, ReportFilters, Observation::visibleTo).
     */
 
     Route::get('/observations', [ObservationController::class, 'index'])
@@ -99,33 +101,40 @@ Route::middleware('auth')->group(function () {
     */
 
     Route::get('/indicators/{category}', [IndicatorController::class, 'show'])
-        ->middleware('role:'.User::ROLE_ADMIN.','.User::ROLE_PIC_MUTU)
+        ->middleware('can:indicators.view')
         ->where('category', 'inm|imp-rs|imp-unit')
         ->name('indicators.show');
 
-    Route::middleware('role:'.User::ROLE_ADMIN)->group(function () {
+    // Each route below requires its own permission (App\Support\Permissions).
+    Route::group([], function () {
         Route::get('/indicators/{category}/create', [IndicatorController::class, 'create'])
             ->where('category', 'imp-rs|imp-unit')
+            ->middleware('can:indicators.create')
             ->name('indicators.create');
 
         Route::post('/indicators/{category}', [IndicatorController::class, 'store'])
             ->where('category', 'imp-rs|imp-unit')
+            ->middleware('can:indicators.create')
             ->name('indicators.store');
 
         Route::get('/indicators/{category}/{indicator}/edit', [IndicatorController::class, 'edit'])
             ->where('category', 'imp-rs|imp-unit')
+            ->middleware('can:indicators.edit')
             ->name('indicators.edit');
 
         Route::put('/indicators/{category}/{indicator}', [IndicatorController::class, 'update'])
             ->where('category', 'imp-rs|imp-unit')
+            ->middleware('can:indicators.edit')
             ->name('indicators.update');
 
         Route::patch('/indicators/{category}/{indicator}/status', [IndicatorController::class, 'toggleStatus'])
             ->where('category', 'imp-rs|imp-unit')
+            ->middleware('can:indicators.edit')
             ->name('indicators.toggle-status');
 
         Route::delete('/indicators/{category}/{indicator}', [IndicatorController::class, 'destroy'])
             ->where('category', 'imp-rs|imp-unit')
+            ->middleware('can:indicators.delete')
             ->name('indicators.destroy');
 
         /*
@@ -135,6 +144,7 @@ Route::middleware('auth')->group(function () {
         */
 
         Route::prefix('/form-builder/{indicator}')
+            ->middleware('can:indicators.edit')
             ->whereNumber(['indicator', 'version'])
             ->name('form-builder.')
             ->group(function () {
@@ -154,6 +164,7 @@ Route::middleware('auth')->group(function () {
         */
 
         Route::prefix('/indicator-unit-mappings')
+            ->middleware('can:indicator_mappings.manage')
             ->whereNumber(['indicator', 'unit'])
             ->name('indicator-unit-mappings.')
             ->group(function () {
@@ -170,11 +181,11 @@ Route::middleware('auth')->group(function () {
         */
 
         Route::prefix('/hris-mappings')->name('hris-mappings.')->group(function () {
-            Route::get('/', [HrisUnitMappingController::class, 'index'])->name('index');
-            Route::post('/', [HrisUnitMappingController::class, 'store'])->name('store');
-            Route::post('/refresh', [HrisUnitMappingController::class, 'refresh'])->name('refresh');
-            Route::post('/refresh-doctors', [HrisUnitMappingController::class, 'refreshDoctors'])->name('refresh-doctors');
-            Route::delete('/{mapping}', [HrisUnitMappingController::class, 'destroy'])->whereNumber('mapping')->name('destroy');
+            Route::get('/', [HrisUnitMappingController::class, 'index'])->middleware('can:hris_mappings.view')->name('index');
+            Route::post('/', [HrisUnitMappingController::class, 'store'])->middleware('can:hris_mappings.manage')->name('store');
+            Route::post('/refresh', [HrisUnitMappingController::class, 'refresh'])->middleware('can:hris_mappings.sync')->name('refresh');
+            Route::post('/refresh-doctors', [HrisUnitMappingController::class, 'refreshDoctors'])->middleware('can:hris_mappings.sync')->name('refresh-doctors');
+            Route::delete('/{mapping}', [HrisUnitMappingController::class, 'destroy'])->middleware('can:hris_mappings.manage')->whereNumber('mapping')->name('destroy');
         });
 
         /*
@@ -184,10 +195,10 @@ Route::middleware('auth')->group(function () {
         */
 
         Route::prefix('/jotform-import')->name('jotform-import.')->group(function () {
-            Route::get('/', [JotformImportController::class, 'index'])->name('index');
-            Route::post('/import-all', [JotformImportController::class, 'importAll'])->name('import-all');
-            Route::post('/{form}/mapping', [JotformImportController::class, 'map'])->whereNumber('form')->name('map');
-            Route::post('/{form}/import', [JotformImportController::class, 'import'])->whereNumber('form')->name('import');
+            Route::get('/', [JotformImportController::class, 'index'])->middleware('can:jotform.view')->name('index');
+            Route::post('/import-all', [JotformImportController::class, 'importAll'])->middleware('can:jotform.import')->name('import-all');
+            Route::post('/{form}/mapping', [JotformImportController::class, 'map'])->middleware('can:jotform.manage')->whereNumber('form')->name('map');
+            Route::post('/{form}/import', [JotformImportController::class, 'import'])->middleware('can:jotform.import')->whereNumber('form')->name('import');
         });
 
         /*
@@ -197,18 +208,23 @@ Route::middleware('auth')->group(function () {
         */
 
         Route::get('/units', [UnitController::class, 'index'])
+            ->middleware('can:units.view')
             ->name('units.index');
 
         Route::post('/units', [UnitController::class, 'store'])
+            ->middleware('can:units.create')
             ->name('units.store');
 
         Route::put('/units/{unit}', [UnitController::class, 'update'])
+            ->middleware('can:units.edit')
             ->name('units.update');
 
         Route::patch('/units/{unit}/status', [UnitController::class, 'toggleStatus'])
+            ->middleware('can:units.edit')
             ->name('units.toggle-status');
 
         Route::delete('/units/{unit}', [UnitController::class, 'destroy'])
+            ->middleware('can:units.delete')
             ->name('units.destroy');
 
         /*
@@ -218,29 +234,54 @@ Route::middleware('auth')->group(function () {
         */
 
         Route::get('/users', [UserController::class, 'index'])
+            ->middleware('can:users.view')
             ->name('users.index');
 
         Route::get('/users/create', [UserController::class, 'create'])
+            ->middleware('can:users.create')
             ->name('users.create');
 
         Route::post('/users', [UserController::class, 'store'])
+            ->middleware('can:users.create')
             ->name('users.store');
 
         Route::get('/users/hris-employees/{employee}', [UserController::class, 'hrisEmployee'])
             ->where('employee', '[0-9a-f]{32}')
+            ->middleware('can:users.create')
             ->name('users.hris-employee');
 
         Route::get('/users/{user}/edit', [UserController::class, 'edit'])
+            ->middleware('can:users.edit')
             ->name('users.edit');
 
         Route::put('/users/{user}', [UserController::class, 'update'])
+            ->middleware('can:users.edit')
             ->name('users.update');
 
         Route::patch('/users/{user}/status', [UserController::class, 'toggleStatus'])
+            ->middleware('can:users.edit')
             ->name('users.toggle-status');
 
         Route::delete('/users/{user}', [UserController::class, 'destroy'])
+            ->middleware('can:users.delete')
             ->name('users.destroy');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Master Jabatan (Manajemen Akses)
+        |--------------------------------------------------------------------------
+        */
+
+        Route::prefix('/roles')->whereNumber('role')->name('roles.')->group(function () {
+            Route::get('/', [RoleController::class, 'index'])->middleware('can:roles.view')->name('index');
+            Route::get('/create', [RoleController::class, 'create'])->middleware('can:roles.manage')->name('create');
+            Route::post('/', [RoleController::class, 'store'])->middleware('can:roles.manage')->name('store');
+            Route::get('/{role}', [RoleController::class, 'show'])->middleware('can:roles.view')->name('show');
+            Route::get('/{role}/edit', [RoleController::class, 'edit'])->middleware('can:roles.manage')->name('edit');
+            Route::put('/{role}', [RoleController::class, 'update'])->middleware('can:roles.manage')->name('update');
+            Route::patch('/{role}/status', [RoleController::class, 'toggleStatus'])->middleware('can:roles.manage')->name('toggle-status');
+            Route::delete('/{role}', [RoleController::class, 'destroy'])->middleware('can:roles.manage')->name('destroy');
+        });
     });
 
     /*

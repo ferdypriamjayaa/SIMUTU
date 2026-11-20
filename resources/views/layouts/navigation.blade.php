@@ -2,19 +2,22 @@
     $user = Auth::user();
     $groups = [
         'menu-utama' => ['label' => 'Menu Utama', 'icon' => 'lucide-house', 'links' => [
-            ['route' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'lucide-layout-dashboard', 'active' => 'dashboard', 'show' => true],
+            ['route' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'lucide-layout-dashboard', 'active' => 'dashboard', 'show' => $user->can('dashboard.view')],
             ['route' => 'observations.create', 'label' => 'Input Observasi', 'icon' => 'lucide-clipboard-plus', 'active' => 'observations.create*', 'show' => $user->can('create', App\Models\Observation::class)],
             ['route' => 'observations.index', 'label' => 'Laporan Observasi', 'icon' => 'lucide-clipboard-list', 'active' => ['observations.index', 'observations.show', 'observations.edit'], 'show' => $user->can('viewAny', App\Models\Observation::class)],
         ]],
         'master-data' => ['label' => 'Master Data', 'icon' => 'lucide-database', 'links' => [
-            ['route' => ['indicators.show', ['category' => 'inm']], 'label' => 'Indikator', 'icon' => 'lucide-chart-column', 'active' => 'indicators.*', 'show' => $user->canViewAllUnits()],
-            ['route' => 'units.index', 'label' => 'Unit', 'icon' => 'lucide-building-2', 'active' => 'units.*', 'show' => $user->isAdmin()],
-            ['route' => 'users.index', 'label' => 'Pengguna', 'icon' => 'lucide-users', 'active' => 'users.*', 'show' => $user->isAdmin()],
+            ['route' => ['indicators.show', ['category' => 'inm']], 'label' => 'Indikator', 'icon' => 'lucide-chart-column', 'active' => 'indicators.*', 'show' => $user->can('indicators.view')],
+            ['route' => 'units.index', 'label' => 'Unit', 'icon' => 'lucide-building-2', 'active' => 'units.*', 'show' => $user->can('units.view')],
+            ['route' => 'indicator-unit-mappings.index', 'label' => 'Mapping Indikator & Unit', 'icon' => 'lucide-arrow-left-right', 'active' => 'indicator-unit-mappings.*', 'show' => $user->can('indicator_mappings.manage')],
         ]],
         'integrasi-sistem' => ['label' => 'Integrasi Sistem', 'icon' => 'lucide-plug', 'links' => [
-            ['route' => 'indicator-unit-mappings.index', 'label' => 'Mapping Indikator & Unit', 'icon' => 'lucide-arrow-left-right', 'active' => 'indicator-unit-mappings.*', 'show' => $user->isAdmin()],
-            ['route' => 'hris-mappings.index', 'label' => 'Mapping Unit HRIS', 'icon' => 'lucide-network', 'active' => 'hris-mappings.*', 'show' => $user->isAdmin()],
-            ['route' => 'jotform-import.index', 'label' => 'Impor Jotform', 'icon' => 'lucide-import', 'active' => 'jotform-import.*', 'show' => $user->isAdmin()],
+            ['route' => 'hris-mappings.index', 'label' => 'Mapping Unit HRIS', 'icon' => 'lucide-network', 'active' => 'hris-mappings.*', 'show' => $user->can('hris_mappings.view')],
+            ['route' => 'jotform-import.index', 'label' => 'Impor Jotform', 'icon' => 'lucide-import', 'active' => 'jotform-import.*', 'show' => $user->can('jotform.view')],
+        ]],
+        'manajemen-akses' => ['label' => 'Manajemen Akses', 'icon' => 'lucide-shield-check', 'links' => [
+            ['route' => 'roles.index', 'label' => 'Master Jabatan', 'icon' => 'lucide-briefcase', 'active' => 'roles.*', 'show' => $user->can('roles.view')],
+            ['route' => 'users.index', 'label' => 'Manajemen Pengguna', 'icon' => 'lucide-users', 'active' => 'users.*', 'show' => $user->can('users.view')],
         ]],
     ];
 

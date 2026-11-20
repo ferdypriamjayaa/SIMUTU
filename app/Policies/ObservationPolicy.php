@@ -12,26 +12,32 @@ class ObservationPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->hasRole(User::ROLE_ADMIN, User::ROLE_PIC_MUTU, User::ROLE_PIC_UNIT);
+        // The Laporan Observasi menu, and at least one category (INM / IMP) to look at.
+        return $user->hasPermission('reports.view') && $user->canAccessAnyArea('view');
     }
 
     public function view(User $user, Observation $observation): bool
     {
+        if (! $user->canAccessCategory($this->categoryOf($observation), 'view')) {
+            return false;
+        }
+
         if ($user->canViewAllUnits()) {
             return true;
         }
 
-        return $user->isPicUnit()
-            && $user->unit_id !== null
+        return $user->unit_id !== null
             && $observation->unit_id === $user->unit_id;
     }
 
     /**
-     * PIC Unit (and Admin) record observations for their own active unit.
+     * The Input Observasi menu plus inm.create and/or imp.create; observations
+     * are recorded for the user's own active unit. Which indicators may be
+     * recorded is narrowed per category in ObservationController.
      */
     public function create(User $user): Response
     {
-        if (! $user->hasRole(User::ROLE_ADMIN, User::ROLE_PIC_UNIT)) {
+        if (! $user->hasPermission('observations.create') || ! $user->canAccessAnyArea('create')) {
             return Response::deny('Jabatan Anda tidak dapat menginput observasi.');
         }
 
@@ -43,35 +49,36 @@ class ObservationPolicy
     }
 
     /**
-     * Admin may correct any INM observation. PIC Unit may correct observations
+     * Holders of the category's edit permission (inm / imp / imp_unit .edit) with
+     * access to every unit may correct any such observation; others only those
      * of their own active unit, for indicators still active and assigned to it.
-     * PIC Mutu reviews data and does not record or change it.
      */
     public function update(User $user, Observation $observation): Response
     {
-        return $this->manage($user, $observation, 'mengubah');
+        return $this->manage($user, $observation, 'mengubah', 'edit');
     }
 
     /**
-     * Deleting follows the same rules as editing.
+     * Deleting follows the same rules as editing, with the category's delete
+     * permission (inm.delete / imp.delete / imp_unit.delete).
      */
     public function delete(User $user, Observation $observation): Response
     {
-        return $this->manage($user, $observation, 'menghapus');
+        return $this->manage($user, $observation, 'menghapus', 'delete');
     }
 
-    private function manage(User $user, Observation $observation, string $action): Response
+    private function manage(User $user, Observation $observation, string $action, string $ability): Response
     {
+        if (! $user->canAccessCategory($this->categoryOf($observation), $ability)) {
+            return Response::deny("Jabatan Anda tidak dapat {$action} observasi.");
+        }
+
         if (ObservationAnswers::versionFor($observation) === null) {
             return Response::deny("Observasi ini tidak memiliki formulir yang dapat Anda {$action}.");
         }
 
-        if ($user->isAdmin()) {
+        if ($user->canViewAllUnits()) {
             return Response::allow();
-        }
-
-        if (! $user->isPicUnit()) {
-            return Response::deny("Jabatan Anda tidak dapat {$action} observasi.");
         }
 
         $unit = $user->activeUnit();
@@ -91,10 +98,18 @@ class ObservationPolicy
     }
 
     /**
-     * Excel/PDF reports are for Admin and PIC Mutu.
+     * Excel and PDF downloads of one indicator's report: the export permission
+     * of its category. Without an indicator: any category's export permission.
      */
-    public function export(User $user): bool
+    public function export(User $user, ?Indicator $indicator = null): bool
     {
-        return $user->canViewAllUnits();
+        return $indicator === null
+            ? $user->canAccessAnyArea('export')
+            : $user->canAccessCategory($indicator->loadMissing('category')->category?->code, 'export');
+    }
+
+    private function categoryOf(Observation $observation): ?string
+    {
+        return $observation->loadMissing('indicator.category')->indicator?->category?->code;
     }
 }

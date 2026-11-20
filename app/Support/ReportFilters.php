@@ -57,7 +57,9 @@ class ReportFilters
             $code = Indicator::with('category')->find((int) $request->query('indicator_id'))?->category?->code;
             $category = collect(self::CATEGORIES)->search(fn (array $c) => $c['code'] === $code) ?: null;
         }
-        $category ??= array_key_first(self::CATEGORIES);
+        // Only the tabs of categories the user may view; the first one by default.
+        $allowed = self::categoriesFor($user);
+        $category ??= array_key_first($allowed) ?? array_key_first(self::CATEGORIES);
 
         $code = self::CATEGORIES[$category]['code'] ?? null;
         $indicatorIds = $code ? self::indicators($user, $category)->pluck('id')->all() : [];
@@ -66,7 +68,7 @@ class ReportFilters
         $validated = validator(
             [...$request->query(), 'kategori' => $category],
             [
-                'kategori' => ['required', Rule::in(array_keys(self::CATEGORIES))],
+                'kategori' => ['required', Rule::in(array_keys($allowed))],
                 'indicator_id' => [$required, 'integer', Rule::in($indicatorIds)],
                 'start_date' => [$required, 'date_format:Y-m-d'],
                 'end_date' => [$required, 'date_format:Y-m-d', 'after_or_equal:start_date'],
@@ -105,6 +107,18 @@ class ReportFilters
             $end,
             $unitId ? Unit::find($unitId) : null,
         );
+    }
+
+    /**
+     * Category tabs the user may view (inm.view / imp.view).
+     *
+     * @return array<string, array{code: string, label: string}>
+     */
+    public static function categoriesFor(User $user): array
+    {
+        $codes = $user->categoryCodes('view');
+
+        return array_filter(self::CATEGORIES, fn (array $c) => in_array($c['code'], $codes, true));
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Role;
 use App\Models\Unit;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -88,11 +89,13 @@ class AccessControlTest extends TestCase
 
     public function test_unknown_role_has_no_observation_access(): void
     {
+        // A role without any permission (unknown slugs are rejected by the foreign key).
+        Role::create(['slug' => 'guest', 'name' => 'Tamu']);
         $user = User::factory()->create(['role' => 'guest']);
 
         $this->actingAs($user)->get('/observations')->assertForbidden();
         $this->actingAs($user)->get('/observations/create')->assertForbidden();
-        $this->actingAs($user)->get('/dashboard')->assertOk();
+        $this->actingAs($user)->get('/dashboard')->assertForbidden();
     }
 
     private function seedImpCategories(): void

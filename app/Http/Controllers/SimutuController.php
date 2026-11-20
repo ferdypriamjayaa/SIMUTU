@@ -70,7 +70,7 @@ class SimutuController extends Controller
         $unitsByIndicator = $mappings->groupBy('indicator_id')->map->pluck('unit_id');
         $indicatorsByUnit = $mappings->groupBy('unit_id')->map->pluck('indicator_id');
 
-        $indicators = $this->indicators($scoped, $byIndicator, $unitsByIndicator);
+        $indicators = $this->indicators($user, $scoped, $byIndicator, $unitsByIndicator);
         $activeIndicatorIds = $indicators->where('is_active', true)->pluck('id');
         $unitRows = $this->unitRows($scoped, $scopeUnitId, $byUnit, $indicatorsByUnit, $activeIndicatorIds);
 
@@ -89,7 +89,7 @@ class SimutuController extends Controller
             'unitRows' => $unitRows,
             'trend' => $this->monthlyTrend($user, $filters),
             'units' => $user->canViewAllUnits() ? Unit::orderBy('name')->get() : collect(),
-            'missingUnit' => $user->isPicUnit() && $user->activeUnit() === null,
+            'missingUnit' => ! $user->canViewAllUnits() && $user->activeUnit() === null,
             ...$this->inputState($user),
         ]);
     }
@@ -103,13 +103,13 @@ class SimutuController extends Controller
      */
     private function inputState(User $user): array
     {
-        $unit = $user->isPicUnit() && $user->can('create', Observation::class) ? $user->activeUnit() : null;
+        $unit = ! $user->canViewAllUnits() && $user->can('create', Observation::class) ? $user->activeUnit() : null;
 
         if ($unit === null) {
             return ['inputIds' => collect(), 'unpublishedIds' => collect()];
         }
 
-        $mapped = Indicator::inputCategory()->where('is_active', true)->assignedTo($unit->id);
+        $mapped = Indicator::inputCategory()->where('is_active', true)->assignedTo($unit->id)->creatableBy($user);
 
         return [
             'inputIds' => (clone $mapped)->whereHas('publishedFormVersion')->pluck('id'),
@@ -129,9 +129,11 @@ class SimutuController extends Controller
      * @param  Collection<int, Collection<int, int>>  $unitsByIndicator  mapped unit IDs per indicator
      * @return Collection<int, Indicator>
      */
-    private function indicators(bool $scoped, Collection $byIndicator, Collection $unitsByIndicator): Collection
+    private function indicators(User $user, bool $scoped, Collection $byIndicator, Collection $unitsByIndicator): Collection
     {
+        // Only categories the user may view (inm.view / imp.view).
         return Indicator::with('category')
+            ->whereHas('category', fn ($q) => $q->whereIn('code', $user->categoryCodes('view')))
             ->orderBy('indicator_category_id')
             ->orderBy('name')
             ->get()

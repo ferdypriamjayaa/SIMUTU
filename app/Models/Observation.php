@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Permissions;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -88,16 +89,27 @@ class Observation extends Model
     }
 
     /**
-     * Limit observations to what the user may see: every unit for Admin and
-     * PIC Mutu, only their own unit for PIC Unit, nothing for anyone else.
+     * Limit observations to what the user may see: categories of their view
+     * permissions (inm.view / imp.view), and every unit with data.view_all_units,
+     * otherwise only their own unit (nothing without one).
      */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
+        $codes = $user->categoryCodes('view');
+
+        if ($codes === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if (count($codes) < count(array_merge(...array_values(Permissions::AREAS)))) {
+            $query->whereHas('indicator.category', fn (Builder $q) => $q->whereIn('code', $codes));
+        }
+
         if ($user->canViewAllUnits()) {
             return $query;
         }
 
-        if ($user->isPicUnit() && $user->unit_id) {
+        if ($user->unit_id) {
             return $query->where('unit_id', $user->unit_id);
         }
 
